@@ -5,8 +5,8 @@
     imports = [wlib.wrapperModules.jujutsu];
     settings = {
       user = {
-        name = "Yurii";
-        email = "yurii@goxore.com";
+        name = "DamnShabu";
+        email = "DamnShabu@porkbuns.xyz";
       };
       aliases.l = logCommand;
       ui.default-command = logCommand;
