@@ -25,6 +25,7 @@
 
       self.nixosModules.discord
       self.nixosModules.gimp
+      self.nixosModules.obsidian
       self.nixosModules.steam
       self.nixosModules.telegram
       self.nixosModules.gaming
