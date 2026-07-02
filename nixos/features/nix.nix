@@ -19,6 +19,16 @@
     programs.nix-ld.enable = true;
     nixpkgs.config.allowUnfree = true;
 
+    nixpkgs.overlays = [
+      (final: prev: {
+        xdg-desktop-portal = prev.xdg-desktop-portal.overrideAttrs (old: {
+          patches = (old.patches or []) ++ [
+            ../../patches/xdg-desktop-portal-fix-proc-root.patch
+          ];
+        });
+      })
+    ];
+
     environment.systemPackages = with pkgs; [
       # Nix tooling
       nil

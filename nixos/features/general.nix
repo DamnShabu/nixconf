@@ -19,6 +19,10 @@
       hashedPasswordFile = "/persist/passwd";
     };
 
+    environment.shells = [
+      self.packages.${pkgs.stdenv.hostPlatform.system}.environment
+    ];
+
     persistance.data.directories = [
       "nixconf"
 

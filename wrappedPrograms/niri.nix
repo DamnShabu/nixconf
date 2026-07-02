@@ -22,6 +22,11 @@
     config.settings = {
       prefer-no-csd = _: {};
 
+      cursor = {
+        xcursor-theme = "Bibata-Modern-Classic";
+        xcursor-size = 24;
+      };
+
       input = {
         focus-follows-mouse = _: {};
 
@@ -185,6 +190,9 @@
       spawn-at-startup = [
         noctaliaExe
         "${pkgs.swaybg}/bin/swaybg -i ${self.wallpaper} -m fill"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-polkit-agent"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-pinentry"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-keyring-prompter"
       ];
     };
   };

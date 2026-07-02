@@ -109,9 +109,22 @@
       self.packages."${pkgs.stdenv.hostPlatform.system}".ask
 
       mullvad-vpn
+
+      self.packages."${pkgs.stdenv.hostPlatform.system}".phisch-psst
     ];
 
     services.mullvad-vpn.enable = true;
+
+    systemd.services.mullvad-autoconnect = {
+      description = "Enable Mullvad VPN auto-connect";
+      after = ["mullvad-daemon.service"];
+      wants = ["mullvad-daemon.service"];
+      wantedBy = ["multi-user.target"];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        ${pkgs.mullvad-vpn}/bin/mullvad connect
+      '';
+    };
 
     xdg.portal.extraPortals = [pkgs.xdg-desktop-portal-gtk];
     xdg.portal.enable = true;
@@ -136,59 +149,6 @@
     persistance.cache.directories = [
       ".config/obs-studio"
     ];
-
-    systemd.services.create_ap = let
-      apPkg = pkgs.linux-wifi-hotspot;
-    in {
-      description = "Create AP Service";
-      after = ["network-online.target"];
-      wants = ["network-online.target"];
-      wantedBy = ["multi-user.target"];
-      path = [pkgs.iproute2 pkgs.gawk pkgs.iw];
-      serviceConfig = {
-        Type = "simple";
-        Restart = "on-failure";
-        RestartSec = 10;
-        RestartSteps = 5;
-      };
-      script = ''
-        set -eu
-
-        for i in $(seq 1 10); do
-          WIFI=$(ip -o link show | grep -v lo | awk -F': ' '/^[0-9]+: wl/{print $2; exit}' || true)
-          if [ -n "$WIFI" ]; then
-            ip link set "$WIFI" up 2>/dev/null || true
-            break
-          fi
-          sleep 1
-        done
-
-        if [ -z "$WIFI" ]; then
-          echo "create_ap: no wifi interface found"
-          exit 1
-        fi
-
-        ETHERNET=$(ip -o link show | grep -v lo | awk -F': ' '/^[0-9]+: e/{print $2; exit}' || true)
-        echo "create_ap: ethernet=$ETHERNET wifi=$WIFI"
-
-        CONF=$(mktemp)
-        {
-          echo "INTERNET_IFACE=$ETHERNET"
-          echo "WIFI_IFACE=$WIFI"
-          echo "SSID=${config.preferences.wifi.ssid}"
-          echo "PASSPHRASE=${config.preferences.wifi.passphrase}"
-          echo "FREQ_BAND=${toString config.preferences.wifi.band}"
-          echo "COUNTRY=${config.preferences.wifi.country}"
-          echo "CHANNEL=${toString config.preferences.wifi.channel}"
-          echo "IEEE80211N=1"
-          echo "IEEE80211AC=1"
-          echo "IEEE80211AX=1"
-          echo "HT_CAPAB=[HT40+]"
-        } > "$CONF"
-
-        exec ${apPkg}/bin/create_ap --config "$CONF"
-      '';
-    };
 
     # no conflicts
     networking.networkmanager.unmanaged = ["wl*"];
