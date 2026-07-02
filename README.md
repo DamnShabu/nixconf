@@ -32,6 +32,8 @@ nh os switch ~/nixconf/
 
 ## Fresh Install
 
+> Run these steps from a **NixOS live USB** (or any other booted disk), not from the system being replaced.
+
 ```bash
 # 1. Partition & format disks
 sudo nix run github:nix-community/disko -- --mode disko ./nixos/hosts/main/disko.nix
