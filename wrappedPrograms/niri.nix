@@ -1,9 +1,9 @@
 {
   self,
   lib,
+  inputs,
   ...
 }: {
-  # unused
   flake.wrappers.niri = {
     wlib,
     pkgs,
@@ -11,6 +11,7 @@
     ...
   }: let
     noctaliaExe = lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.noctalia-shell;
+    skwd-wall = inputs."skwd-wall".packages.${pkgs.stdenv.hostPlatform.system}.default;
   in {
     imports = [wlib.wrapperModules.niri];
 
@@ -122,6 +123,8 @@
         "Mod+Shift+S".spawn-sh = "${pkgs.grim}/bin/grim -g \"$(${pkgs.slurp}/bin/slurp -w 0)\" - | ${pkgs.wl-clipboard}/bin/wl-copy";
 
         "Mod+d".spawn-sh = "${lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.menu1}";
+
+        "Mod+W".spawn-sh = "${skwd-wall}/bin/skwd wall toggle";
       };
 
       layout = {
@@ -189,7 +192,7 @@
 
       spawn-at-startup = [
         noctaliaExe
-        "${pkgs.swaybg}/bin/swaybg -i ${self.wallpaper} -m fill"
+        "${skwd-wall}/bin/skwd-daemon"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-polkit-agent"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-pinentry"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-keyring-prompter"

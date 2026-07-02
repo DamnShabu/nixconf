@@ -41,6 +41,9 @@
 
       # flatpak management
       inputs.nix-flatpak.nixosModules.nix-flatpak
+
+      # skwd-wall wallpaper selector + daemon
+      inputs.skwd-wall.nixosModules.default
     ];
 
     preferences.monitors = {
@@ -132,6 +135,7 @@
     hardware.graphics.enable = true;
 
     programs.niri.enable = true;
+    programs.skwd-wall.enable = true;
 
     networking.firewall.enable = false;
     programs.appimage.enable = true;

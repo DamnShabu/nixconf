@@ -28,6 +28,11 @@
     nix-gaming.url = "github:fufexan/nix-gaming";
 
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
+
+    skwd-wall = {
+      url = "github:liixini/skwd-wall";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Import all .nix files from current directory except flake.nix recursively
