@@ -20,7 +20,6 @@
       selfpkgs.terminal
       pkgs.pcmanfm
       selfpkgs.noctalia-shell
-      selfpkgs.yin
       pkgs.wl-clipboard
     ];
 

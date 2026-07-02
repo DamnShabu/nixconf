@@ -12,34 +12,6 @@
     ];
 
     perSystem = {pkgs, lib, system, ...}: {
-      packages.yin = pkgs.stdenv.mkDerivation rec {
-        pname = "yin";
-        version = "0.1";
-        src = pkgs.fetchFromGitHub {
-          owner = "SaverinOnRails";
-          repo = "yin";
-          rev = "8769afc299a47b4f26cb0315a8f5975def277b33";
-          hash = "sha256-9dBTXq2u9iB0HtnUI2/1QSv/8fllIlmL1YZ/u/+dd1I=";
-        };
-        nativeBuildInputs = with pkgs; [meson ninja pkg-config wayland-scanner];
-        buildInputs = with pkgs; [
-          wayland
-          wayland-protocols
-          libglvnd
-          mesa
-          ffmpeg
-          libva
-        ];
-        # yin's meson.build doesn't set install:true on executables
-        dontUseMesonInstall = true;
-        installPhase = ''
-          mkdir -p $out/bin
-          cp yin $out/bin/
-          cp yinctl $out/bin/
-        '';
-        meta.platforms = lib.platforms.linux;
-      };
-
       packages.phisch-psst = pkgs.rustPlatform.buildRustPackage rec {
         pname = "psst";
         version = "0.2.0";
