@@ -5,8 +5,19 @@
     ...
   }: {
     services.tlp.enable = true;
+    services.tlp.settings.USB_AUTOSUSPEND = 0;
     services.thermald.enable = true;
     powerManagement.powertop.enable = true;
+
+    systemd.services.disable-usb-autosuspend = {
+      description = "Disable USB autosuspend for all devices";
+      after = ["powertop.service"];
+      wantedBy = ["multi-user.target"];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.bash}/bin/bash -c 'for d in /sys/bus/usb/devices/*/power/control; do echo on > \"$d\"; done; for d in /sys/bus/usb/devices/*/power/autosuspend; do echo -1 > \"$d\"; done'";
+      };
+    };
 
     hardware.amdgpu.overdrive.enable = true;
     services.lact.enable = true;

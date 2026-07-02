@@ -12,6 +12,8 @@
       data = "$HOME/.cache/noctalia";
       "esc-fn" = wlib.escapeShellArgWithEnv;
     };
+    # Writable config dir so Noctalia can install plugins & save settings at runtime
+    outOfStoreConfig = "$HOME/.config/noctalia";
     colors = {
       mError = "#fb4934";
       mHover = "#83a598";
@@ -484,7 +486,7 @@
 
       templates = {
         activeTemplates = [];
-        enableUserTheming = false;
+        enableUserTheming = true;
       };
 
       nightLight = {

@@ -2,15 +2,26 @@
   flake.nixosModules.gtk = {
     pkgs,
     lib,
+    config,
     ...
   }: let
-    theme-name = "Gruvbox-Green-Dark-Medium";
-    theme-package = pkgs.gruvbox-gtk-theme.override {
-      colorVariants = ["dark"];
-      sizeVariants = ["standard"];
-      themeVariants = ["green"];
-      tweakVariants = ["medium" "macos"];
+    theme-package = pkgs.stdenvNoCC.mkDerivation {
+      pname = "material-gnome-theme";
+      version = "1.2.0";
+      src = pkgs.fetchFromGitHub {
+        owner = "SakibShahariar";
+        repo = "material-gnome-theme";
+        rev = "v1.2.0";
+        hash = "sha256-q8/vUbWB2hkxcHo5MWyzIcg+piUSiAYKKUXCFnTWQ8M=";
+      };
+      installPhase = ''
+        mkdir -p $out/share/themes/Material-Gnome
+        cp -r gtk-3.0 gtk-4.0 gnome-shell themes index.theme \
+          $out/share/themes/Material-Gnome/
+      '';
+      meta.platforms = lib.platforms.linux;
     };
+    theme-name = "Material-Gnome";
 
     icon-theme-package = pkgs.gruvbox-plus-icons;
     icon-theme-name = "Gruvbox-Plus-Dark";
@@ -68,5 +79,15 @@
       pkgs.gtk3
       pkgs.gtk4
     ];
+
+    systemd.user.tmpfiles.rules = [
+      "L+ %h/.local/share/themes/Material-Gnome - - - - ${theme-package}/share/themes/Material-Gnome"
+      "L+ %h/.config/noctalia/palettes - - - - ${theme-package}/share/themes/Material-Gnome/themes"
+    ];
+
+    # Make theme visible to Flatpak apps
+    services.flatpak.overrides = lib.mkIf config.services.flatpak.enable {
+      global.Context.filesystems = ["xdg-data/themes:ro"];
+    };
   };
 }

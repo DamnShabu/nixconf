@@ -16,6 +16,7 @@
       extraGroups = ["wheel" "networkmanager"];
       shell = self.packages.${pkgs.stdenv.hostPlatform.system}.environment;
 
+      initialPassword = "12345";
       hashedPasswordFile = "/persist/passwd";
     };
 
