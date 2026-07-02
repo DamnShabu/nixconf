@@ -189,7 +189,7 @@
 
       spawn-at-startup = [
         noctaliaExe
-        "${pkgs.swaybg}/bin/swaybg -i ${self.wallpaper} -m fill"
+        "${pkgs.bash}/bin/bash -c '${self.packages.${pkgs.stdenv.hostPlatform.system}.yin}/bin/yin & sleep 0.5 && ${self.packages.${pkgs.stdenv.hostPlatform.system}.yin}/bin/yinctl --img ${self.wallpaper}'"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-polkit-agent"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-pinentry"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-keyring-prompter"
