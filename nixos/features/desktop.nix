@@ -41,15 +41,12 @@
     i18n.defaultLocale = config.preferences.locale.default;
     i18n.extraLocaleSettings = config.preferences.locale.extra;
 
-    services.upower.enable = true;
-
     security.polkit.enable = true;
 
     hardware = {
       enableAllFirmware = true;
 
       bluetooth.enable = true;
-      bluetooth.powerOnBoot = true;
 
       graphics = {
         enable = true;

@@ -60,16 +60,6 @@
         autoHideDelay = 500;
         autoShowDelay = 150;
         showOnWorkspaceSwitch = true;
-        mouseWheelAction = "none";
-        reverseScroll = false;
-        mouseWheelWrap = true;
-        middleClickAction = "none";
-        middleClickFollowMouse = false;
-        middleClickCommand = "";
-        rightClickAction = "controlCenter";
-        rightClickFollowMouse = true;
-        rightClickCommand = "";
-        screenOverrides = [];
         widgets = {
           left = [
             {
@@ -81,6 +71,15 @@
               icon = "noctalia";
               id = "ControlCenter";
               useDistroLogo = true;
+            }
+            {
+              clockColor = "none";
+              customFont = "";
+              formatHorizontal = "HH:mm ddd, MMM dd";
+              formatVertical = "HH mm - dd MM";
+              id = "Clock";
+              tooltipFormat = "HH:mm ddd, MMM dd";
+              useCustomFont = false;
             }
           ];
           center = [
@@ -99,6 +98,13 @@
               textColor = "none";
               useFixedWidth = false;
               visualizerType = "mirrored";
+            }
+            {
+              displayMode = "onhover";
+              iconColor = "none";
+              id = "Volume";
+              middleClickCommand = "pwvucontrol || pavucontrol";
+              textColor = "none";
             }
           ];
           right = [
@@ -134,10 +140,20 @@
             }
           ];
         };
+        mouseWheelAction = "none";
+        reverseScroll = false;
+        mouseWheelWrap = true;
+        middleClickAction = "none";
+        middleClickFollowMouse = false;
+        middleClickCommand = "";
+        rightClickAction = "controlCenter";
+        rightClickFollowMouse = true;
+        rightClickCommand = "";
+        screenOverrides = [];
       };
 
       general = {
-        avatarImage = "/nix/store/n99d6fkc07sb4xb4rd7cch6b8qrhvvb3-gruvbox-mountain-village.png";
+        avatarImage = "";
         dimmerOpacity = 0.15;
         showScreenCorners = false;
         forceBlackScreenCorners = false;
@@ -173,8 +189,6 @@
         lockScreenMonitors = [];
         lockScreenBlur = 0;
         lockScreenTint = 0;
-        reverseScroll = false;
-        smoothScrollEnabled = true;
         keybinds = {
           keyUp = ["Up"];
           keyDown = ["Down"];
@@ -184,6 +198,8 @@
           keyEscape = ["Esc"];
           keyRemove = ["Del"];
         };
+        reverseScroll = false;
+        smoothScrollEnabled = true;
       };
 
       ui = {
@@ -474,7 +490,7 @@
 
       colorSchemes = {
         useWallpaperColors = false;
-        predefinedScheme = "Noctalia (default)";
+        predefinedScheme = "Ayu";
         darkMode = true;
         schedulingMode = "off";
         manualSunrise = "06:30";

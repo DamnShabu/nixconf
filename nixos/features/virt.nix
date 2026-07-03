@@ -72,10 +72,7 @@
   in {
     users.users.${config.preferences.user.name}.extraGroups = ["libvirtd"];
 
-    virtualisation = {
-      libvirtd.enable = true;
-      spiceUSBRedirection.enable = true;
-    };
+    virtualisation.libvirtd.enable = true;
 
     programs.virt-manager.enable = true;
 

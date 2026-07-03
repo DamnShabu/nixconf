@@ -30,8 +30,6 @@
       self.nixosModules.telegram
       self.nixosModules.gaming
       self.nixosModules.vr
-      self.nixosModules.powersave
-
       self.nixosModules.virt
       self.nixosModules.searxng
 
@@ -66,8 +64,6 @@
     programs.corectrl.enable = true;
 
     boot = {
-      kernelPackages = pkgs.linuxPackages_latest;
-
       loader.grub.enable = true;
       loader.grub.efiSupport = true;
       loader.grub.efiInstallAsRemovable = true;
@@ -76,7 +72,7 @@
 
       # kernelParams = ["quiet" "amd_pstate=guided" "processor.max_cstate=1"];
       kernelParams = ["quiet"];
-      kernelModules = ["mt7921e" "coretemp" "cpuid" "v4l2loopback"];
+      kernelModules = ["coretemp" "cpuid" "v4l2loopback"];
 
       binfmt.emulatedSystems = ["aarch64-linux"];
     };
@@ -91,7 +87,6 @@
     hardware.cpu.amd.updateMicrocode = true;
 
     services = {
-      hardware.openrgb.enable = true;
       flatpak.enable = true;
       udisks2.enable = true;
       printing.enable = true;
@@ -154,8 +149,7 @@
       ".config/obs-studio"
     ];
 
-    # no conflicts
-    networking.networkmanager.unmanaged = ["wl*"];
+
     # speed
     networking.firewall.allowedUDPPorts = [53 67];
 

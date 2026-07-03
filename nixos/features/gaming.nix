@@ -7,7 +7,6 @@
     hardware.graphics.enable = lib.mkDefault true;
 
     programs = {
-      gamemode.enable = true;
       gamescope.enable = true;
     };
 

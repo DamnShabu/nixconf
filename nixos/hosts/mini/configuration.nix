@@ -27,7 +27,6 @@
 
       self.nixosModules.gaming
 
-      self.nixosModules.powersave
     ];
 
     boot.loader.systemd-boot.enable = true;
@@ -39,8 +38,6 @@
 
     programs.niri.enable = true;
     programs.niri.package = self.packages.${config.pkgs.stdenv.hostPlatform.system}.niri;
-
-    boot.kernelPackages = pkgs.linuxPackages_latest;
 
     system.stateVersion = "25.11";
   };
