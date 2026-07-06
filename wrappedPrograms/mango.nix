@@ -11,7 +11,6 @@
     ...
   }: let
     noctaliaExe = lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.noctalia-shell;
-    skwd-wall = inputs."skwd-wall".packages.${pkgs.stdenv.hostPlatform.system}.default;
 
   in {
     imports = [wlib.wrapperModules.mangowc];
@@ -24,7 +23,6 @@
     config = {
       autostart_sh = ''
         ${noctaliaExe} &
-        ${skwd-wall}/bin/skwd-daemon &
       '';
 
       settings = {

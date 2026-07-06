@@ -13,7 +13,7 @@
       "esc-fn" = wlib.escapeShellArgWithEnv;
     };
     # Writable config dir so Noctalia can install plugins & save settings at runtime
-    outOfStoreConfig = "$HOME/.config/noctalia";
+    outOfStoreConfig = "/home/yurii/.config/noctalia";
     colors = {
       mError = "#fb4934";
       mHover = "#83a598";

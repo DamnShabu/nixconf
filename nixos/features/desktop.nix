@@ -16,11 +16,18 @@
     programs.mangowc.enable = true;
     programs.mangowc.package = selfpkgs.mangowc;
 
+    services.xserver.enable = true;
+    services.displayManager.sddm.enable = true;
+    services.displayManager.sddm.theme = "clockwork";
+    services.displayManager.sddm.extraPackages = [ pkgs.qt6.qt5compat pkgs.qt6.qtmultimedia ];
+    services.displayManager.defaultSession = "niri";
+
     environment.systemPackages = [
       selfpkgs.terminal
       pkgs.pcmanfm
       selfpkgs.noctalia-shell
       pkgs.wl-clipboard
+      selfpkgs.qylock
     ];
 
     fonts.packages = with pkgs; [

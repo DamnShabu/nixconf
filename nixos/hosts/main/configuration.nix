@@ -40,8 +40,6 @@
       # flatpak management
       inputs.nix-flatpak.nixosModules.nix-flatpak
 
-      # skwd-wall wallpaper selector + daemon
-      inputs.skwd-wall.nixosModules.default
     ];
 
     preferences.monitors = {
@@ -124,13 +122,20 @@
       '';
     };
 
-    xdg.portal.extraPortals = [pkgs.xdg-desktop-portal-gtk];
-    xdg.portal.enable = true;
+    xdg.portal = {
+      extraPortals = [pkgs.xdg-desktop-portal-gtk];
+      enable = true;
+      config = {
+        common = {
+          default = ["gtk"];
+          "org.freedesktop.impl.portal.FileChooser" = "gtk";
+        };
+      };
+    };
 
     hardware.graphics.enable = true;
 
     programs.niri.enable = true;
-    programs.skwd-wall.enable = true;
 
     networking.firewall.enable = false;
     programs.appimage.enable = true;

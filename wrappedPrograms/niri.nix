@@ -11,7 +11,6 @@
     ...
   }: let
     noctaliaExe = lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.noctalia-shell;
-    skwd-wall = inputs."skwd-wall".packages.${pkgs.stdenv.hostPlatform.system}.default;
   in {
     imports = [wlib.wrapperModules.niri];
 
@@ -123,8 +122,6 @@
         "Mod+Shift+S".spawn-sh = "${pkgs.grim}/bin/grim -g \"$(${pkgs.slurp}/bin/slurp -w 0)\" - | ${pkgs.wl-clipboard}/bin/wl-copy";
 
         "Mod+d".spawn-sh = "${lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.menu1}";
-
-        "Mod+W".spawn-sh = "${skwd-wall}/bin/skwd wall toggle";
       };
 
       layout = {
@@ -146,6 +143,15 @@
         {
           geometry-corner-radius = 8;
           clip-to-geometry = true;
+        }
+      ];
+
+      layer-rules = [
+        {
+          match = {
+            namespace = "^noctalia-overview-";
+          };
+          place-within-backdrop = true;
         }
       ];
 
@@ -190,12 +196,11 @@
       xwayland-satellite.path =
         lib.getExe pkgs.xwayland-satellite;
 
-      spawn-at-startup = [
-        noctaliaExe
-        "${skwd-wall}/bin/skwd-daemon"
+      spawn-sh-at-startup = [
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-polkit-agent"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-pinentry"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-keyring-prompter"
+        noctaliaExe
       ];
     };
   };

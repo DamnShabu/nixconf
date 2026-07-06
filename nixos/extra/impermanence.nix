@@ -44,6 +44,8 @@
               "/tmp"
 
               "/var/lib/zerotier-one"
+              "/etc/mullvad-vpn"
+              "/var/cache/mullvad-vpn"
               # {
               #   directory = "/var/lib/colord";
               #   user = "colord";

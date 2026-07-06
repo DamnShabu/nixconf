@@ -12,6 +12,28 @@
     ];
 
     perSystem = {pkgs, lib, system, ...}: {
+      packages.qylock = pkgs.stdenvNoCC.mkDerivation {
+        pname = "qylock";
+        version = "main";
+        src = pkgs.fetchFromGitHub {
+          owner = "Darkkal44";
+          repo = "qylock";
+          rev = "main";
+          hash = "sha256-jVNBiyhdA0lU2CapcgoWO9WlnEF/EBg+JfpPf/G/CzQ=";
+        };
+        installPhase = ''
+          mkdir -p $out/share/sddm/themes/clockwork
+          cp -r themes/clockwork/orbital/* $out/share/sddm/themes/clockwork/
+          # also install other themes alongside
+          for d in themes/*/; do
+            name=$(basename "$d")
+            [ "$name" = "clockwork" ] && continue
+            cp -r "$d" $out/share/sddm/themes/
+          done
+        '';
+        meta.platforms = lib.platforms.linux;
+      };
+
       packages.phisch-psst = pkgs.rustPlatform.buildRustPackage rec {
         pname = "psst";
         version = "0.2.0";

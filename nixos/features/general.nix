@@ -29,6 +29,7 @@
 
       "Videos"
       "Documents"
+      "Downloads"
       "Projects"
 
       ".ssh"
