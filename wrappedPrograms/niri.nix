@@ -148,9 +148,9 @@
 
       layer-rules = [
         {
-          match = {
-            namespace = "^noctalia-overview-";
-          };
+          matches = [
+            { namespace = "^noctalia-overview-"; }
+          ];
           place-within-backdrop = true;
         }
       ];
