@@ -8,12 +8,9 @@
     package = pkgs.noctalia-shell.overrideAttrs {
       name = "vjnoctalia2";
     };
-    env."NOCTALIA_CACHE_DIR" = {
-      data = "$HOME/.cache/noctalia";
-      "esc-fn" = wlib.escapeShellArgWithEnv;
-    };
-    # Writable config dir so Noctalia can install plugins & save settings at runtime
+    # writable config dir so Noctalia can install plugins & save settings at runtime
     outOfStoreConfig = "/home/yurii/.config/noctalia";
+    # NOCTALIA_CACHE_DIR intentionally not set — app defaults to ~/.cache/noctalia at runtime, avoiding build-time $HOME issues
     colors = {
       mError = "#fb4934";
       mHover = "#83a598";
@@ -245,7 +242,6 @@
       wallpaper = {
         enabled = true;
         overviewEnabled = true;
-        directory = "$HOME/Pictures/Wallpapers";
         monitorDirectories = [];
         enableMultiMonitorDirectories = false;
         showHiddenFiles = false;

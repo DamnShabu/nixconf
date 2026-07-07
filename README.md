@@ -13,7 +13,7 @@ Personal NixOS flake configuration.
 │   ├── extra/             # Third-party integrations (hjem, impermanence)
 │   ├── features/          # Feature modules (desktop, gaming, flatpak, etc.)
 │   └── hosts/             # Host-specific configs (main, mini)
-└── wrappedPrograms/       # Wrapped programs (git, niri, mangowc, neovim, etc.)
+└── wrappedPrograms/       # Wrapped programs (git, niri, neovim, etc.)
 ```
 
 ## Hosts
@@ -22,7 +22,7 @@ Personal NixOS flake configuration.
 
 ## Features
 
-Includes: niri/mangowc WM, noctalia shell, neovim, git/jj, SearXNG, Obsidian, Steam, Discord, Telegram, GIMP, Zen browser, gaming/VR, podman/libvirt, and more.
+Includes: niri WM, noctalia shell, neovim, git/jj, SearXNG, Obsidian, Steam, Discord, Telegram, GIMP, Zen browser, gaming/VR, podman/libvirt, and more.
 
 ## Usage
 

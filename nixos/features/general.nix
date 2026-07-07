@@ -39,6 +39,8 @@
       ".config/vicinae"
       ".local/share/vicinae"
       ".local/state/vicinae"
+
+      ".config/noctalia"
     ];
 
     # todo: remove
@@ -50,7 +52,6 @@
       ".config/nvim"
 
       ".cache/noctalia"
-      ".cache/mullvad-vpn"
     ];
   };
 }

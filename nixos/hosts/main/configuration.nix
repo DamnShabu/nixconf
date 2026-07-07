@@ -88,7 +88,10 @@
       flatpak.enable = true;
       udisks2.enable = true;
       printing.enable = true;
+      upower.enable = true;
+      power-profiles-daemon.enable = true;
     };
+
 
     programs.alvr.enable = true;
     programs.alvr.openFirewall = true;

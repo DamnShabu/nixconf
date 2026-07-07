@@ -13,8 +13,6 @@
     programs.niri.enable = true;
     programs.niri.package = selfpkgs.niri;
 
-    programs.mangowc.enable = true;
-    programs.mangowc.package = selfpkgs.mangowc;
 
     services.xserver.enable = true;
     services.displayManager.sddm.enable = true;
