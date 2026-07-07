@@ -20,7 +20,9 @@
       environment.persistence = {
         "/persist/userdata".users."${cfg.user}" = {
           directories = cfg.data.directories;
-          files = cfg.data.files;
+          files = cfg.data.files ++ [
+            { file = ".face"; method = "symlink"; }
+          ];
         };
 
         "/persist/usercache".users."${cfg.user}" = {

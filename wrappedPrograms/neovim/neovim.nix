@@ -86,8 +86,7 @@
     imports = [
       wlib.wrapperModules.neovim
       self.wrapperModules.neovim-main
-      self.wrapperModules.neovim-lua
-      self.wrapperModules.neovim-nix
+      self.wrapperModules.neovim-allServers
     ];
   };
 

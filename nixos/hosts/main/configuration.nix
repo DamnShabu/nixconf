@@ -12,6 +12,7 @@
   flake.nixosModules.hostMain = {
     pkgs,
     config,
+    lib,
     ...
   }: {
     imports = [
@@ -23,6 +24,7 @@
 
       self.nixosModules.flatpak
 
+      self.nixosModules.opencode
       self.nixosModules.discord
       self.nixosModules.gimp
       self.nixosModules.obsidian
@@ -32,6 +34,7 @@
       self.nixosModules.vr
       self.nixosModules.virt
       self.nixosModules.searxng
+      self.nixosModules.user-config
 
       # disko
       inputs.disko.nixosModules.disko
@@ -77,7 +80,7 @@
     boot.plymouth.enable = true;
 
     networking = {
-      hostName = "main";
+      hostName = lib.mkDefault "main";
       networkmanager.enable = true;
     };
 

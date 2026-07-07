@@ -6,6 +6,7 @@
   flake.wrappers.kitty = {
     wlib,
     config,
+    pkgs,
     ...
   }: {
     imports = [wlib.wrapperModules.kitty];
@@ -16,6 +17,12 @@
     };
 
     config = {
+      # Use KITTY_CONFIG_DIRECTORY env var instead of --config flag to fix
+      # "Failed to launch child: +open" kitty kitten issue (#1519, #4885).
+      # The --config flag placed before +open args makes kitty treat the
+      # kitten as a program name instead of a built-in action.
+      flags = lib.mkForce {};
+      env.KITTY_CONFIG_DIRECTORY = "${builtins.dirOf config.constructFiles.kittyConfig.path}";
       settings = {
         enable_audio_bell = "no";
 
@@ -26,6 +33,11 @@
 
         allow_remote_control = "yes";
         shell_integration = "enabled";
+        # Disable URL detection to prevent false positives like
+        # "flatpak install flathub org.vinegarhq.Sober" being
+        # misinterpreted as a URL when clicked.
+        detect_urls = "no";
+        url_style = "none";
 
         cursor_trail = 3;
 

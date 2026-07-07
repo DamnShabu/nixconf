@@ -26,6 +26,11 @@
       selfpkgs.noctalia-shell
       pkgs.wl-clipboard
       selfpkgs.qylock
+      pkgs.xdg-utils
+      selfpkgs.niri-setup
+      selfpkgs.niri-setup-desktop
+      pkgs.age
+      pkgs.sops
     ];
 
     fonts.packages = with pkgs; [

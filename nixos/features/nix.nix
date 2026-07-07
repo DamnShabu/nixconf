@@ -37,6 +37,7 @@
       alejandra
       manix
       nix-inspect
+      mcp-nixos
     ];
   };
 }

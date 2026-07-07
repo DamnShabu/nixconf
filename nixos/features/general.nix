@@ -27,6 +27,7 @@
     persistence.data.directories = [
       "nixconf"
 
+      "Pictures"
       "Videos"
       "Documents"
       "Downloads"
@@ -42,6 +43,21 @@
 
       ".config/noctalia"
     ];
+
+    system.activationScripts."create-initial-face" = {
+      deps = [ "createPersistentStorageDirs" ];
+      text = ''
+        targetFile="/persist/userdata/home/${config.preferences.user.name}/.face"
+        if [ -d "$targetFile" ]; then
+          rmdir "$targetFile" 2>/dev/null || rm -rf "$targetFile"
+        fi
+        if [ ! -f "$targetFile" ]; then
+          mkdir -p "$(dirname "$targetFile")"
+          touch "$targetFile"
+        fi
+        chown "${config.preferences.user.name}" "$targetFile"
+      '';
+    };
 
     persistence.cache.directories = [
       ".local/share/zoxide"

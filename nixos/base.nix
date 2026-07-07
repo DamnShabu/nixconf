@@ -45,7 +45,7 @@
         locale = {
           timeZone = lib.mkOption {
             type = lib.types.str;
-            default = "Europe/Kyiv";
+            default = "Europe/Berlin";
           };
           default = lib.mkOption {
             type = lib.types.str;

@@ -1,1 +1,3 @@
 result
+.sops.yaml
+user-config/api-keys.nix
