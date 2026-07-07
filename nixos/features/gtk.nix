@@ -5,23 +5,8 @@
     config,
     ...
   }: let
-    theme-package = pkgs.stdenvNoCC.mkDerivation {
-      pname = "material-gnome-theme";
-      version = "1.2.0";
-      src = pkgs.fetchFromGitHub {
-        owner = "SakibShahariar";
-        repo = "material-gnome-theme";
-        rev = "v1.2.0";
-        hash = "sha256-q8/vUbWB2hkxcHo5MWyzIcg+piUSiAYKKUXCFnTWQ8M=";
-      };
-      installPhase = ''
-        mkdir -p $out/share/themes/Material-Gnome
-        cp -r gtk-3.0 gtk-4.0 gnome-shell themes index.theme \
-          $out/share/themes/Material-Gnome/
-      '';
-      meta.platforms = lib.platforms.linux;
-    };
-    theme-name = "Material-Gnome";
+    theme-package = pkgs.orchis-theme;
+    theme-name = "Orchis-Dark";
 
     icon-theme-package = pkgs.gruvbox-plus-icons;
     icon-theme-name = "Gruvbox-Plus-Dark";
@@ -81,8 +66,7 @@
     ];
 
     systemd.user.tmpfiles.rules = [
-      "L+ %h/.local/share/themes/Material-Gnome - - - - ${theme-package}/share/themes/Material-Gnome"
-      "L+ %h/.config/noctalia/palettes - - - - ${theme-package}/share/themes/Material-Gnome/themes"
+      "L+ %h/.local/share/themes/${theme-name} - - - - ${theme-package}/share/themes/${theme-name}"
     ];
 
     # Make theme visible to Flatpak apps
