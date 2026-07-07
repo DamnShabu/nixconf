@@ -36,7 +36,7 @@
 
     services.zerotierone.enable = true;
 
-    persistance.cache.directories = [
+    persistence.cache.directories = [
       ".local/share/Hytale"
       ".local/share/hytale-launcher"
 
@@ -72,7 +72,6 @@
         dxvk
       ];
 
-      # todo: fix
       text = ''
         export WINEPREFIX="$HOME/Games/Wow"
         export WINEARCH=win64

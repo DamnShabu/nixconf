@@ -7,7 +7,7 @@
       }];
     };
 
-    persistance.directories = [
+    persistence.directories = [
       "/var/lib/flatpak"
     ];
   };

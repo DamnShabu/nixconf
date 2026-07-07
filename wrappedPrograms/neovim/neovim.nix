@@ -97,7 +97,7 @@
       self.wrapperModules.neovim-main
       self.wrapperModules.neovim-allServers
     ];
-    dynamicMode = true;
+    dynamicMode = false;
   };
 
   flake.wrappers.neovimDynamic = { wlib, ... }: {

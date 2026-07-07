@@ -68,7 +68,6 @@
 
       supportedFilesystems.ntfs = true;
 
-      # kernelParams = ["quiet" "amd_pstate=guided" "processor.max_cstate=1"];
       kernelParams = ["quiet"];
       kernelModules = ["coretemp" "cpuid" "v4l2loopback"];
 
@@ -91,7 +90,6 @@
       upower.enable = true;
       power-profiles-daemon.enable = true;
     };
-
 
     programs.alvr.enable = true;
     programs.alvr.openFirewall = true;
@@ -153,14 +151,11 @@
         obs-move-transition
       ];
     };
-    persistance.cache.directories = [
+    persistence.cache.directories = [
       ".config/obs-studio"
     ];
 
 
-    # speed
-    networking.firewall.allowedUDPPorts = [53 67];
-
-    system.stateVersion = "23.11";
+    system.stateVersion = "25.11";
   };
 }

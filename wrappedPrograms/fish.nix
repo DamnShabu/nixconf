@@ -64,14 +64,14 @@
                     cd ~
                     set mnt "(string escape $mnt)"
                     if test -n \"$mnt\"
-                        if mountpoint -q \"\$mnt\"
-                            if umount \"\$mnt\"
-                                echo 'unmounted \$mnt successfully'
+                        if mountpoint -q \"$mnt\"
+                            if umount \"$mnt\"
+                                echo \"unmounted $mnt successfully\"
                             else
-                                echo 'failed to unmount \$mnt'
+                                echo \"failed to unmount $mnt\"
                             end
                         else
-                            echo '\$mnt is not a mountpoint'
+                            echo \"$mnt is not a mountpoint\"
                         end
                     end
                 end

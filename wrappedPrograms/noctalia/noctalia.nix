@@ -45,14 +45,14 @@
         contentPadding = 2;
         fontScale = 1;
         enableExclusionZoneInset = true;
-        backgroundOpacity = 0.93;
+        backgroundOpacity = 0.52;
         useSeparateOpacity = false;
         marginVertical = 20;
         marginHorizontal = 500;
         frameThickness = 8;
         frameRadius = 12;
         outerCorners = true;
-        hideOnOverview = false;
+        hideOnOverview = true;
         displayMode = "always_visible";
         autoHideDelay = 500;
         autoShowDelay = 150;
@@ -151,7 +151,7 @@
 
       general = {
         avatarImage = "";
-        dimmerOpacity = 0.15;
+        dimmerOpacity = 0.43;
         showScreenCorners = false;
         forceBlackScreenCorners = false;
         scaleRatio = 1;
@@ -207,8 +207,8 @@
         tooltipsEnabled = true;
         scrollbarAlwaysVisible = true;
         boxBorderEnabled = false;
-        panelBackgroundOpacity = 1;
-        translucentWidgets = false;
+        panelBackgroundOpacity = 0.41;
+        translucentWidgets = true;
         panelsAttachedToBar = true;
         settingsPanelMode = "attached";
         settingsPanelSideBarCardStyle = false;
@@ -242,6 +242,7 @@
       wallpaper = {
         enabled = true;
         overviewEnabled = true;
+        directory = "/home/yurii/Pictures/Wallpapers";
         monitorDirectories = [];
         enableMultiMonitorDirectories = false;
         showHiddenFiles = false;
@@ -420,6 +421,8 @@
           { action = "reboot"; command = ""; countdownEnabled = true; enabled = true; keybind = "4"; }
           { action = "logout"; command = ""; countdownEnabled = true; enabled = true; keybind = "5"; }
           { action = "shutdown"; command = ""; countdownEnabled = true; enabled = true; keybind = "6"; }
+          { action = "userspaceReboot"; command = ""; countdownEnabled = true; enabled = false; keybind = ""; }
+          { action = "rebootToUefi"; command = ""; countdownEnabled = true; enabled = true; keybind = "7"; }
         ];
       };
 

@@ -94,7 +94,7 @@
       };
     };
 
-    persistance.directories = [
+    persistence.directories = [
       "/var/lib/libvirt"
     ];
   };

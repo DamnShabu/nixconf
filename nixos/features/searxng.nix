@@ -4,7 +4,6 @@
       use_default_settings: true
 
       server:
-        secret_key: "wYonYcIAM9eI4iYtIA01a0XU3x2VNb"
         image_proxy: true
 
       search:
@@ -13,7 +12,7 @@
           - json
     '';
   in {
-    persistance.data.directories = [
+    persistence.data.directories = [
       "searxng"
     ];
 
@@ -42,7 +41,9 @@
     systemd.services."podman-searxng" = {
       preStart = ''
         mkdir -p /persist/searxng/config /persist/searxng/data
-        cp ${settingsYml} /persist/searxng/config/settings.yml
+        if [[ ! -f /persist/searxng/config/settings.yml ]]; then
+          cp ${settingsYml} /persist/searxng/config/settings.yml
+        fi
       '';
     };
   };

@@ -50,19 +50,19 @@
           cmake
           clang
         ];
-      buildInputs = with pkgs; [
-        wayland
-        wayland-protocols
-        libxkbcommon
-        fontconfig
-        freetype
-        libGL
-        vulkan-loader
-        openssl
-        systemd
-      ] ++ lib.optionals pkgs.stdenv.isLinux [
-        pkgs.alsa-lib
-      ];
+        buildInputs = with pkgs; [
+          wayland
+          wayland-protocols
+          libxkbcommon
+          fontconfig
+          freetype
+          libGL
+          vulkan-loader
+          openssl
+          systemd
+        ] ++ lib.optionals pkgs.stdenv.isLinux [
+          pkgs.alsa-lib
+        ];
         postFixup = let
           libPath = lib.makeLibraryPath [pkgs.wayland pkgs.libglvnd pkgs.mesa pkgs.vulkan-loader];
         in ''

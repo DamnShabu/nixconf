@@ -22,6 +22,10 @@
     config.settings = {
       prefer-no-csd = _: {};
 
+      hotkey-overlay = {
+        show-at-startup = false;
+      };
+
       cursor = {
         xcursor-theme = "Bibata-Modern-Classic";
         xcursor-size = 24;
@@ -121,7 +125,6 @@
 
         "Mod+Shift+S".spawn-sh = "${pkgs.grim}/bin/grim -g \"$(${pkgs.slurp}/bin/slurp -w 0)\" - | ${pkgs.wl-clipboard}/bin/wl-copy";
 
-        "Mod+d".spawn-sh = "${lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.menu1}";
       };
 
       layout = {
@@ -152,6 +155,16 @@
             { namespace = "^noctalia-overview-"; }
           ];
           place-within-backdrop = true;
+        }
+        {
+          matches = [
+            { namespace = "^psst-"; }
+          ];
+          background-effect = {
+            blur = true;
+            xray = true;
+          };
+          geometry-corner-radius = 16;
         }
       ];
 
@@ -197,9 +210,9 @@
         lib.getExe pkgs.xwayland-satellite;
 
       spawn-sh-at-startup = [
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-polkit-agent"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-pinentry"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.phisch-psst}/bin/psst-keyring-prompter"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-polkit-agent}/bin/psst-polkit-agent"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-pinentry}/bin/psst-pinentry"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-keyring-prompter}/bin/psst-keyring-prompter"
         noctaliaExe
       ];
     };

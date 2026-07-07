@@ -4,7 +4,7 @@
       pkgs.youtube-music
     ];
 
-    persistance.cache.directories = [
+    persistence.cache.directories = [
       ".config/YouTube Music"
     ];
   };

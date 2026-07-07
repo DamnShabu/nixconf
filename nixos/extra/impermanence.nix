@@ -4,7 +4,7 @@
     config,
     ...
   }: let
-    cfg = config.persistance;
+    cfg = config.persistence;
   in {
     imports = [
       inputs.impermanence.nixosModules.impermanence
@@ -18,9 +18,6 @@
       boot.tmp.cleanOnBoot = lib.mkDefault true;
 
       environment.persistence = {
-        # "/persist/userdata".users = persistentData;
-        # "/persist/usercache".users = persistentCache;
-
         "/persist/userdata".users."${cfg.user}" = {
           directories = cfg.data.directories;
           files = cfg.data.files;
@@ -46,12 +43,6 @@
               "/var/lib/zerotier-one"
               "/etc/mullvad-vpn"
               "/var/cache/mullvad-vpn"
-              # {
-              #   directory = "/var/lib/colord";
-              #   user = "colord";
-              #   group = "colord";
-              #   mode = "u=rwx,g=rx,o=";
-              # }
             ]
             ++ cfg.directories;
           files =

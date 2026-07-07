@@ -24,7 +24,7 @@
       self.packages.${pkgs.stdenv.hostPlatform.system}.environment
     ];
 
-    persistance.data.directories = [
+    persistence.data.directories = [
       "nixconf"
 
       "Videos"
@@ -43,8 +43,7 @@
       ".config/noctalia"
     ];
 
-    # todo: remove
-    persistance.cache.directories = [
+    persistence.cache.directories = [
       ".local/share/zoxide"
       ".local/share/direnv"
       ".local/share/nvim"

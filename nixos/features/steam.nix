@@ -4,7 +4,7 @@
 
     hardware.steam-hardware.enable = true;
 
-    persistance.data.directories = [
+    persistence.data.directories = [
       ".var/app/com.valvesoftware.Steam"
     ];
   };

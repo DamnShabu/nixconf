@@ -199,7 +199,7 @@
         #lua
         ''
           vim.lsp.config['parser4'] = {
-            cmd = { '$HOME/Videos/parser4/target/release/parser4', 'lsp' },
+            cmd = { vim.fn.expand('$HOME') .. '/Videos/parser4/target/release/parser4', 'lsp' },
             filetypes = { 'vjxl' },
             root_markers = { '.git' },
             root_dir = vim.fn.getcwd(),
@@ -220,7 +220,7 @@
         ''
           vim.lsp.config['vjcustom'] = {
             -- cmd = { '/home/yurii/Projects/rust/nix-lsp/target/debug/nix-lsp' },
-            cmd = { 'nix', 'run', '$HOME/Projects/rust/nix-lsp/' },
+            cmd = { 'nix', 'run', vim.fn.expand('$HOME') .. '/Projects/rust/nix-lsp/' },
             filetypes = { 'nix' },
             root_markers = { '.git' },
             root_dir = vim.fn.getcwd(),

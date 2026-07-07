@@ -105,16 +105,22 @@
 
     packages.ask = pkgs.writeShellApplication {
       name = "ask";
+      runtimeInputs = [pkgs.jq];
       text = ''
         API_KEY=$(cat /persist/openrouterapi)
         PROMPT="''${1:-$(cat)}"
+
+        DATA=$(jq -n --arg model "google/gemini-3.1-flash-lite" --arg content "$PROMPT" '{
+          model: $model,
+          messages: [{role: "user", content: $content}]
+        }')
 
         curl -s https://openrouter.ai/api/v1/chat/completions \
           -H "Authorization: Bearer $API_KEY" \
           -H "Content-Type: application/json" \
           -H "HTTP-Referer: https://local" \
           -H "X-Title: cli" \
-          -d "{\"model\":\"google/gemini-3.1-flash-lite\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}]}" \
+          -d "$DATA" \
         | ${lib.getExe pkgs.jq} -r '.choices[0].message.content'
       '';
     };
