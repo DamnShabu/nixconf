@@ -67,6 +67,9 @@
 
     systemd.user.tmpfiles.rules = [
       "L+ %h/.local/share/themes/${theme-name} - - - - ${theme-package}/share/themes/${theme-name}"
+      "L+ %h/.config/gtk-4.0/gtk.css - - - - ${theme-package}/share/themes/${theme-name}/gtk-4.0/gtk-dark.css"
+      "L+ %h/.config/gtk-4.0/gtk-dark.css - - - - ${theme-package}/share/themes/${theme-name}/gtk-4.0/gtk-dark.css"
+      "L+ %h/.config/gtk-4.0/assets - - - - ${theme-package}/share/themes/${theme-name}/gtk-4.0/assets"
     ];
 
     # Make theme visible to Flatpak apps
