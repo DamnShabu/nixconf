@@ -23,7 +23,7 @@
       prefer-no-csd = _: {};
 
       hotkey-overlay = {
-        show-at-startup = false;
+        skip-at-startup = _: {};
       };
 
       cursor = {
