@@ -32,6 +32,10 @@ entry:focus { border-color: #555; box-shadow: none; }
 .status-text { font-size:14px; }
 .done-icon { font-size:48px; }
 .entry-error { border-color:#e74c3c; border-width:1.5px; }
+.tile { border-radius:12px; padding:6px 2px; border:2px solid transparent; background:rgba(255,255,255,0.03); }
+.tile:hover { border-color:#555; background:rgba(255,255,255,0.06); }
+.tile-done { border-color:#2ecc71; }
+.tile-on { border-color:#3584e4; background:rgba(53,132,228,0.1); }
 button.suggested-action { background:#3584e4; color:#fff; border:none; border-radius:8px; padding:6px 20px; font-weight:600; }
 button.suggested-action:hover { background:#4a94f0; }
 button.suggested-action:disabled { background:#33343d; color:#666; }
@@ -510,6 +514,9 @@ creation_rules:
         # Write user-config files for Nix to consume at build time
         try:
             os.makedirs(USER_CONFIG, exist_ok=True)
+            username = "yurii"
+            with open(os.path.join(USER_CONFIG, "_user.nix"), "w") as f:
+                f.write('{ name = "%s"; }\n' % username)
             connection_data = self.connection_data or {}
             conn_fields = {"git_user", "git_email", "hostname", "wifi_ssid", "wifi_password", "tailscale"}
             nix_conn = {k: v for k, v in connection_data.items() if k in conn_fields}
@@ -734,6 +741,7 @@ class WelcomePage(Gtk.Box):
 
         # Spacer
         self.pack_start(Gtk.Box(), True, True, 0)
+        self.pack_start(Gtk.Box(), False, False, 0)
 
         # Password
         gf = Gtk.Grid(row_spacing=6, column_spacing=10, margin_top=40)
@@ -1209,6 +1217,40 @@ class SopsPage(Gtk.Box):
 
 
 class ConnectionPage(Gtk.Box):
+    ICON_NAMES = {
+        "mullvad": "mullvad-vpn",
+        "ssh": "security-high",
+        "gpg": "dialog-password",
+        "openpgp": "application-certificate",
+        "signify": "security-medium",
+        "openai": "ai",
+        "anthropic": "ai",
+        "gemini": "gemini",
+        "openrouter": "network-vpn",
+        "git": "git",
+        "hostname": "computer",
+        "wifi_ssid": "network-wireless",
+        "wifi_password": "network-wireless",
+        "tailscale": "network-vpn",
+    }
+
+    ITEMS = [
+        ("mullvad",       "Mullvad",       False, False),
+        ("ssh",           "SSH",           False, False),
+        ("gpg",           "GPG",           False, False),
+        ("openpgp",       "OpenPGP",       False, False),
+        ("signify",       "Signify",       False, False),
+        ("openai",        "OpenAI",        True,  False),
+        ("anthropic",     "Anthropic",     True,  False),
+        ("gemini",        "Gemini",        True,  False),
+        ("openrouter",    "OpenRouter",    True,  False),
+        ("git",           "Git",           False, False),
+        ("hostname",      "Hostname",      False, False),
+        ("wifi_ssid",     "WiFi SSID",     False, False),
+        ("wifi_password", "WiFi pass",     True,  False),
+        ("tailscale",     "Tailscale",     False, True),
+    ]
+
     def __init__(self, wiz):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.wiz = wiz
@@ -1231,151 +1273,377 @@ class ConnectionPage(Gtk.Box):
         sw.set_min_content_height(300)
         self.pack_start(sw, True, True, 0)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=10)
-        sw.add(box)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        outer.set_margin_top(10)
+        sw.add(outer)
 
-        def row(icon_name, label_text, widget):
-            hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DND)
-            icon.set_pixel_size(22)
-            icon.set_valign(Gtk.Align.START)
-            icon.set_margin_top(4)
-            lbl = Gtk.Label(label=label_text, xalign=0, width_chars=9)
-            lbl.set_valign(Gtk.Align.START)
-            lbl.set_margin_top(4)
-            hb.pack_start(icon, False, False, 0)
-            hb.pack_start(lbl, False, False, 0)
-            hb.pack_start(widget, True, True, 0)
-            box.pack_start(hb, False, False, 0)
+        grid = Gtk.Grid(row_spacing=8, column_spacing=8)
+        grid.set_halign(Gtk.Align.CENTER)
+        outer.pack_start(grid, False, False, 0)
+        outer.pack_start(Gtk.Box(), True, True, 0)
 
-        def sep():
-            s = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-            s.set_margin_top(3)
-            s.set_margin_bottom(3)
-            box.pack_start(s, False, False, 0)
+        self.values = {}
+        self.tiles = {}
+        self.buttons = {}
+        self.status_lbls = {}
+        self.checkmarks = {}
+        COLS = 4
 
-        self.mullvad_entry = Gtk.Entry()
-        self.mullvad_entry.set_placeholder_text("Mullvad account number")
-        row("network-vpn-symbolic", "Mullvad", self.mullvad_entry)
+        for i, (key, label, secret, toggle) in enumerate(self.ITEMS):
+            r, c = divmod(i, COLS)
+            tile = self._make_tile(key, label, toggle)
+            grid.attach(tile, c, r, 1, 1)
+            self.tiles[key] = tile
 
-        sep()
+    def _make_tile(self, key, label, is_toggle):
+        btn = Gtk.Button()
+        btn.get_style_context().add_class("tile")
+        btn.set_size_request(126, 100)
+        btn.set_relief(Gtk.ReliefStyle.NONE)
 
-        self.ssh_entry = Gtk.Entry()
-        self.ssh_entry.set_placeholder_text("ssh-ed25519 AAAA...")
-        row("security-high-symbolic", "SSH", self.ssh_entry)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        vbox.set_valign(Gtk.Align.CENTER)
+        vbox.set_vexpand(True)
 
-        self.gpg_entry = Gtk.Entry()
-        self.gpg_entry.set_placeholder_text("0123456789ABCDEF")
-        row("dialog-password-symbolic", "GPG", self.gpg_entry)
+        icon_name = self.ICON_NAMES.get(key, "emblem-system")
+        icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
+        icon.set_pixel_size(42)
+        vbox.pack_start(icon, False, False, 0)
 
-        self.openpgp_entry = Gtk.Entry()
-        self.openpgp_entry.set_placeholder_text("OpenPGP key fingerprint")
-        row("application-certificate-symbolic", "OpenPGP", self.openpgp_entry)
+        lbl = Gtk.Label(label=label)
+        vbox.pack_start(lbl, False, False, 0)
 
-        self.signify_entry = Gtk.Entry()
-        self.signify_entry.set_placeholder_text("RWT...")
-        row("security-medium-symbolic", "Signify", self.signify_entry)
+        status_lbl = Gtk.Label()
+        status_lbl.set_markup("<span size='small' color='#666'></span>")
+        vbox.pack_start(status_lbl, False, False, 0)
+        self.status_lbls[key] = status_lbl
 
-        sep()
+        btn.add(vbox)
+        self.buttons[key] = btn
 
-        self.oai_entry = Gtk.Entry()
-        self.oai_entry.set_placeholder_text("sk-...")
-        self.oai_entry.set_visibility(False)
-        row("applications-engineering-symbolic", "OpenAI", self.oai_entry)
+        overlay = Gtk.Overlay()
+        overlay.add(btn)
 
-        self.ant_entry = Gtk.Entry()
-        self.ant_entry.set_placeholder_text("sk-ant-...")
-        self.ant_entry.set_visibility(False)
-        row("applications-engineering-symbolic", "Anthropic", self.ant_entry)
+        check = Gtk.Label()
+        check.set_markup("<span foreground='#2ecc71' size='x-large'>\u2713</span>")
+        check.set_valign(Gtk.Align.START)
+        check.set_halign(Gtk.Align.END)
+        check.set_margin_top(3)
+        check.set_margin_end(3)
+        check.set_no_show_all(True)
+        overlay.add_overlay(check)
+        self.checkmarks[key] = check
 
-        self.gemini_entry = Gtk.Entry()
-        self.gemini_entry.set_placeholder_text("Gemini / Google AI key")
-        self.gemini_entry.set_visibility(False)
-        row("applications-engineering-symbolic", "Gemini", self.gemini_entry)
+        btn.connect("clicked", lambda b, k=key: self._on_tile_click(k))
+        return overlay
 
-        self.openrouter_entry = Gtk.Entry()
-        self.openrouter_entry.set_placeholder_text("OpenRouter API key")
-        self.openrouter_entry.set_visibility(False)
-        row("applications-engineering-symbolic", "OpenRouter", self.openrouter_entry)
+    def _on_tile_click(self, key):
+        if key == "tailscale":
+            self.values["tailscale"] = not self.values.get("tailscale", False)
+            self._update_tile(key)
+            return
+        if key == "git":
+            self._edit_git()
+            return
+        item = next((x for x in self.ITEMS if x[0] == key), None)
+        if not item:
+            return
+        _, label, secret, _ = item
+        self._edit_dialog(key, label, secret)
 
-        sep()
+    def _update_tile(self, key):
+        ctx = self.buttons[key].get_style_context()
+        done = False
+        if key == "tailscale":
+            if self.values.get("tailscale"):
+                ctx.add_class("tile-on")
+                self._set_tile_status(key, "On")
+                self.checkmarks[key].show()
+            else:
+                ctx.remove_class("tile-on")
+                self._set_tile_status(key, "Off")
+                self.checkmarks[key].hide()
+            return
+        if key == "git":
+            name = self.values.get("git_user", "")
+            email = self.values.get("git_email", "")
+            done = bool(name and email)
+            if done:
+                self._set_tile_status(key, name[:12] + ("\u2026" if len(name) > 12 else ""))
+            else:
+                self._set_tile_status(key, name or "")
+        else:
+            val = self.values.get(key)
+            done = bool(val and str(val).strip())
+            if done:
+                s = str(val)
+                self._set_tile_status(key, s[:12] + ("\u2026" if len(s) > 12 else ""))
+            else:
+                self._set_tile_status(key, "")
+        if done:
+            ctx.add_class("tile-done")
+            self.checkmarks[key].show()
+        else:
+            ctx.remove_class("tile-done")
+            self.checkmarks[key].hide()
 
-        self.git_user_entry = Gtk.Entry()
-        self.git_user_entry.set_placeholder_text("Your Name")
-        row("avatar-default-symbolic", "Git name", self.git_user_entry)
+    def _set_tile_status(self, key, text):
+        self.status_lbls[key].set_markup(f"<span size='small' color='#888'>{text}</span>")
 
-        self.git_email_entry = Gtk.Entry()
-        self.git_email_entry.set_placeholder_text("your@email.com")
-        row("mail-send-symbolic", "Git email", self.git_email_entry)
+    def _mk_entry(self, placeholder, secret, text=""):
+        e = Gtk.Entry()
+        e.set_placeholder_text(placeholder)
+        e.set_visibility(not secret)
+        if text:
+            e.set_text(text)
+        if secret:
+            e.set_visibility(False)
+            e.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
+                                      "view-reveal-symbolic")
+            e.connect("icon-press", self._toggle_visibility)
+        return e
 
-        sep()
+    def _edit_git(self):
+        d = Gtk.Dialog(title="Git", transient_for=self.wiz, modal=True)
+        d.set_default_size(380, -1)
+        d.set_resizable(False)
 
-        self.hostname_entry = Gtk.Entry()
-        self.hostname_entry.set_placeholder_text("e.g. my-laptop")
-        row("computer-symbolic", "Hostname", self.hostname_entry)
+        c = d.get_content_area()
+        c.set_margin_start(20)
+        c.set_margin_end(20)
+        c.set_margin_top(16)
+        c.set_margin_bottom(8)
+        c.set_spacing(6)
 
-        self.wifi_ssid_entry = Gtk.Entry()
-        self.wifi_ssid_entry.set_placeholder_text("WiFi network name")
-        row("network-wireless-symbolic", "WiFi SSID", self.wifi_ssid_entry)
+        hdr = Gtk.Label(xalign=0)
+        hdr.set_markup("<b><span size='large'>Git Configuration</span></b>")
+        c.pack_start(hdr, False, False, 0)
 
-        self.wifi_password_entry = Gtk.Entry()
-        self.wifi_password_entry.set_placeholder_text("WiFi password")
-        self.wifi_password_entry.set_visibility(False)
-        row("network-wireless-symbolic", "WiFi pass", self.wifi_password_entry)
+        name_e = self._mk_entry("Your Name", False, self.values.get("git_user", ""))
+        email_e = self._mk_entry("your@email.com", False, self.values.get("git_email", ""))
 
-        self.tailscale_switch = Gtk.Switch()
-        self.tailscale_switch.set_active(False)
-        self.tailscale_switch.set_halign(Gtk.Align.START)
-        self.tailscale_switch.set_valign(Gtk.Align.CENTER)
-        row("network-vpn-symbolic", "Tailscale", self.tailscale_switch)
+        c.pack_start(name_e, False, False, 0)
+        c.pack_start(email_e, False, False, 0)
+
+        err = Gtk.Label(xalign=0)
+        err.set_markup("<span color='#e74c3c' size='small'></span>")
+        err.set_no_show_all(True)
+        c.pack_start(err, False, False, 0)
+
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("_Save", Gtk.ResponseType.OK)
+
+        d.show_all()
+        response = d.run()
+        while response == Gtk.ResponseType.OK:
+            name = name_e.get_text().strip()
+            email = email_e.get_text().strip()
+            if not name:
+                err.set_markup("<span color='#e74c3c' size='small'>Name is required</span>")
+                err.show()
+            elif email and ("@" not in email or "." not in email.split("@")[-1]):
+                err.set_markup("<span color='#e74c3c' size='small'>Invalid email address</span>")
+                err.show()
+            else:
+                if name:
+                    self.values["git_user"] = name
+                else:
+                    self.values.pop("git_user", None)
+                if email:
+                    self.values["git_email"] = email
+                else:
+                    self.values.pop("git_email", None)
+                self._update_tile("git")
+                break
+            d.show()
+            response = d.run()
+        d.destroy()
+
+    def _edit_dialog(self, key, label, secret):
+        d = Gtk.Dialog(title=label, transient_for=self.wiz, modal=True)
+        d.set_default_size(380, -1)
+        d.set_resizable(False)
+
+        c = d.get_content_area()
+        c.set_margin_start(20)
+        c.set_margin_end(20)
+        c.set_margin_top(16)
+        c.set_margin_bottom(8)
+        c.set_spacing(6)
+
+        hdr = Gtk.Label(xalign=0)
+        hdr.set_markup(f"<b><span size='large'>{label}</span></b>")
+        c.pack_start(hdr, False, False, 0)
+
+        entry = self._mk_entry(f"Enter {label}", secret, str(self.values.get(key, "")))
+        c.pack_start(entry, False, False, 0)
+
+        err = Gtk.Label(xalign=0)
+        err.set_markup("<span color='#e74c3c' size='small'></span>")
+        err.set_no_show_all(True)
+        c.pack_start(err, False, False, 0)
+
+        api_keys = ("openai", "anthropic", "gemini", "openrouter")
+        verify_btn = None
+        verify_lbl = None
+        if key in api_keys:
+            verify_lbl = Gtk.Label(xalign=0)
+            verify_lbl.set_no_show_all(True)
+            c.pack_start(verify_lbl, False, False, 0)
+            verify_btn = Gtk.Button(label="_Verify", use_underline=True)
+            verify_btn.set_halign(Gtk.Align.START)
+            c.pack_start(verify_btn, False, False, 0)
+
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("_Save", Gtk.ResponseType.OK)
+
+        if verify_btn:
+
+            def on_verify(b):
+                val = entry.get_text().strip()
+                if not val:
+                    return
+                verify_btn.set_sensitive(False)
+                verify_btn.set_label("Verifying\u2026")
+
+                def do_verify():
+                    ok, msg = self._verify_api_key(key, val)
+                    GLib.idle_add(lambda: _show_result(ok, msg))
+                    GLib.idle_add(lambda: verify_btn.set_sensitive(True))
+                    GLib.idle_add(lambda: verify_btn.set_label("_Verify"))
+
+                def _show_result(ok, msg):
+                    if ok:
+                        verify_lbl.set_markup(
+                            f"<span foreground='#2ecc71'>\u2713 {msg}</span>")
+                    else:
+                        verify_lbl.set_markup(
+                            f"<span foreground='#e74c3c'>\u2717 {msg}</span>")
+                    verify_lbl.show()
+
+                t = threading.Thread(target=do_verify, daemon=True)
+                t.start()
+
+            verify_btn.connect("clicked", on_verify)
+
+        d.show_all()
+        response = d.run()
+        while response == Gtk.ResponseType.OK:
+            val = entry.get_text().strip()
+            if not val:
+                self.values.pop(key, None)
+                self._update_tile(key)
+                break
+            ok, msg = self._validate(key, val)
+            if ok:
+                self.values[key] = val
+                self._update_tile(key)
+                break
+            err.set_markup(f"<span color='#e74c3c' size='small'>{msg}</span>")
+            err.show()
+            d.show()
+            response = d.run()
+        d.destroy()
+
+    def _toggle_visibility(self, entry, pos, *a):
+        v = not entry.get_visibility()
+        entry.set_visibility(v)
+        entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
+                                      "view-conceal-symbolic" if v else "view-reveal-symbolic")
+
+    def _validate(self, key, val):
+        if key == "mullvad":
+            if not val.isdigit():
+                return False, "Must be a numeric account number"
+        elif key == "ssh":
+            if not val.startswith(("ssh-ed25519 ", "ssh-rsa ", "ssh-ecdsa ", "ssh-ed448 ", "ssh-dss ")):
+                return False, "Must start with ssh-ed25519, ssh-rsa, etc."
+        elif key == "gpg":
+            if not re.match(r'^[0-9A-Fa-f]{16,40}$', val):
+                return False, "Must be a 16\u201340 char hex fingerprint"
+        elif key == "openpgp":
+            if not re.match(r'^[0-9A-Fa-f]{16,40}$', val):
+                return False, "Must be a 16\u201340 char hex fingerprint"
+        elif key == "signify":
+            if not val.startswith("RWT"):
+                return False, "Must start with RWT..."
+        elif key == "openai":
+            if not val.startswith("sk-"):
+                return False, "Must start with sk-..."
+        elif key == "anthropic":
+            if not val.startswith("sk-ant-"):
+                return False, "Must start with sk-ant-..."
+        elif key == "hostname":
+            if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$', val):
+                return False, "Invalid hostname format"
+        return True, ""
+
+    def _verify_api_key(self, key, val):
+        import urllib.request
+        import urllib.error
+        if key == "openai":
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {val}"},
+                method="HEAD")
+            try:
+                urllib.request.urlopen(req, timeout=8)
+                return True, "Key valid"
+            except urllib.error.HTTPError as e:
+                return False, f"HTTP {e.code}: {e.reason}"
+            except Exception as e:
+                return False, f"Error: {e}"
+        elif key == "anthropic":
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": val, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                data=b'{}',
+                method="POST")
+            try:
+                urllib.request.urlopen(req, timeout=8)
+                return True, "Key valid"
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    return False, "Key invalid"
+                return True, "Auth accepted"
+            except Exception as e:
+                return False, f"Error: {e}"
+        elif key == "gemini":
+            req = urllib.request.Request(
+                f"https://generativelanguage.googleapis.com/v1/models?key={val}",
+                method="HEAD")
+            try:
+                urllib.request.urlopen(req, timeout=8)
+                return True, "Key valid"
+            except urllib.error.HTTPError as e:
+                return False, f"HTTP {e.code}: {e.reason}"
+            except Exception as e:
+                return False, f"Error: {e}"
+        elif key == "openrouter":
+            req = urllib.request.Request(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={"Authorization": f"Bearer {val}"})
+            try:
+                urllib.request.urlopen(req, timeout=8)
+                return True, "Key valid"
+            except urllib.error.HTTPError as e:
+                return False, f"HTTP {e.code}: {e.reason}"
+            except Exception as e:
+                return False, f"Error: {e}"
+        return True, ""
 
     def get_result(self):
-        data = {}
-        for key, attr in [
-            ("mullvad", self.mullvad_entry),
-            ("ssh", self.ssh_entry),
-            ("gpg", self.gpg_entry),
-            ("openpgp", self.openpgp_entry),
-            ("signify", self.signify_entry),
-            ("openai", self.oai_entry),
-            ("anthropic", self.ant_entry),
-            ("gemini", self.gemini_entry),
-            ("openrouter", self.openrouter_entry),
-            ("git_user", self.git_user_entry),
-            ("git_email", self.git_email_entry),
-            ("hostname", self.hostname_entry),
-            ("wifi_ssid", self.wifi_ssid_entry),
-            ("wifi_password", self.wifi_password_entry),
-        ]:
-            v = attr.get_text().strip()
-            if v:
-                data[key] = v
-        data["tailscale"] = self.tailscale_switch.get_active()
-        return data
+        return dict(self.values)
 
     def set_initial_values(self, data):
         if not data:
             return
-        for key, attr in [
-            ("mullvad", self.mullvad_entry),
-            ("ssh", self.ssh_entry),
-            ("gpg", self.gpg_entry),
-            ("openpgp", self.openpgp_entry),
-            ("signify", self.signify_entry),
-            ("openai", self.oai_entry),
-            ("anthropic", self.ant_entry),
-            ("gemini", self.gemini_entry),
-            ("openrouter", self.openrouter_entry),
-            ("git_user", self.git_user_entry),
-            ("git_email", self.git_email_entry),
-            ("hostname", self.hostname_entry),
-            ("wifi_ssid", self.wifi_ssid_entry),
-            ("wifi_password", self.wifi_password_entry),
-        ]:
-            if key in data and data[key]:
-                attr.set_text(data[key])
-        if "tailscale" in data:
-            self.tailscale_switch.set_active(bool(data["tailscale"]))
+        for k, v in data.items():
+            if v:
+                self.values[k] = v
+        for k in list(self.tiles):
+            self._update_tile(k)
 
 
 class GitHubPage(Gtk.Box):

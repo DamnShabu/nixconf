@@ -35,6 +35,7 @@
       self.nixosModules.virt
       self.nixosModules.searxng
       self.nixosModules.user-config
+      self.nixosModules.user
 
       # disko
       inputs.disko.nixosModules.disko
