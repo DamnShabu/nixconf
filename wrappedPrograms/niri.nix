@@ -149,7 +149,13 @@
         }
         {
           matches = [
-            { app-id = "^niri-setup$"; }
+            { app-id = "^mojo-setup$"; }
+          ];
+          background-effect = { blur = true; };
+        }
+        {
+          matches = [
+            { app-id = "^app\\.zen_browser\\.zen$"; }
           ];
           background-effect = { blur = true; };
         }
@@ -219,7 +225,7 @@
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-polkit-agent}/bin/psst-polkit-agent"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-pinentry}/bin/psst-pinentry"
         "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-keyring-prompter}/bin/psst-keyring-prompter"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.niri-setup}/bin/niri-setup --first-run"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.mojo-setup}/bin/mojo-setup --first-run"
         noctaliaExe
       ];
     };

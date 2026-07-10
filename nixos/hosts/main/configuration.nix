@@ -36,6 +36,10 @@
       self.nixosModules.searxng
       self.nixosModules.user-config
       self.nixosModules.user
+      self.nixosModules.sops
+      self.nixosModules.keys
+      self.nixosModules.mullvad
+      self.nixosModules.connections
 
       # disko
       inputs.disko.nixosModules.disko
@@ -46,22 +50,7 @@
 
     ];
 
-    preferences.monitors = {
-      "HDMI-A-1" = {
-        width = 1920;
-        height = 1080;
-        refreshRate = 60;
-        x = 0;
-        y = 0;
-      };
-      "DP-1" = {
-        width = 1920;
-        height = 1080;
-        refreshRate = 165.003;
-        x = 0;
-        y = 1080;
-      };
-    };
+    nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
     programs.corectrl.enable = true;
 
@@ -109,23 +98,8 @@
       android-tools
       self.packages."${pkgs.stdenv.hostPlatform.system}".ask
 
-      mullvad-vpn
-
       self.packages."${pkgs.stdenv.hostPlatform.system}".phisch-psst
     ];
-
-    services.mullvad-vpn.enable = true;
-
-    systemd.services.mullvad-autoconnect = {
-      description = "Enable Mullvad VPN auto-connect";
-      after = ["mullvad-daemon.service"];
-      wants = ["mullvad-daemon.service"];
-      wantedBy = ["multi-user.target"];
-      serviceConfig.Type = "oneshot";
-      script = ''
-        ${pkgs.mullvad-vpn}/bin/mullvad connect
-      '';
-    };
 
     xdg.portal = {
       extraPortals = [pkgs.xdg-desktop-portal-gtk];

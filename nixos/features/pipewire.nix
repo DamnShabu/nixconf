@@ -1,10 +1,5 @@
 {
   flake.nixosModules.pipewire = {pkgs, ...}: {
-    preferences.keymap = {
-      "SUPER + v".exec = ''${pkgs.alsa-utils}/bin/amixer sset Capture toggle'';
-      "SUPER + d"."s".package = pkgs.pwvucontrol;
-    };
-
     persistence.cache.directories = [
       ".local/state/wireplumber"
     ];

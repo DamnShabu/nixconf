@@ -54,16 +54,6 @@
     env.EDITOR = lib.getExe selfpkgs.neovimDynamic;
   };
 
-  flake.wrappers.desktop = {pkgs, ...}: let
-    selfpkgs = self.packages."${pkgs.stdenv.hostPlatform.system}";
-  in {
-    imports = [self.wrapperModules.niri];
-    terminal = lib.getExe selfpkgs.terminal;
-    env = {
-      EDITOR = lib.getExe selfpkgs.neovim;
-    };
-  };
-
   flake.wrappers.terminal = {pkgs, ...}: let
     selfpkgs = self.packages."${pkgs.stdenv.hostPlatform.system}";
   in {
@@ -91,33 +81,6 @@
         "--on-init" = "{c: restart-all}";
         "--log-dir" = "/tmp/jprocsall.log";
       };
-    };
-
-    packages.vol = pkgs.writeShellApplication {
-      name = "vol";
-
-      runtimeInputs = [pkgs.playerctl pkgs.gawk];
-
-      text = ''
-        set -euo pipefail
-
-        f="''${XDG_CACHE_HOME:-$HOME/.cache}/vol"
-        v=$(cat "$f" 2>/dev/null || echo 0.5)
-        s=0.1
-
-        case "''${1:-}" in
-          up)   v=$(awk -v v="$v" -v s="$s" 'BEGIN{print v+s}') ;;
-          down) v=$(awk -v v="$v" -v s="$s" 'BEGIN{print v-s}') ;;
-          set)  v="''${2:-$v}" ;;
-          *) exit 1 ;;
-        esac
-
-        v=$(awk -v v="$v" 'BEGIN{if(v<0)v=0;if(v>1)v=1;print v}')
-
-        playerctl volume "$v"
-        mkdir -p "$(dirname "$f")"
-        echo "$v" > "$f"
-      '';
     };
 
     packages.nix-check-bin = pkgs.writeShellScriptBin "nix-check-bin" ''

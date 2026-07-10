@@ -1,3 +1,7 @@
 result
 .sops.yaml
 user-config/api-keys.nix
+secrets/*
+!secrets/.gitkeep
+__pycache__/
+*.pyc

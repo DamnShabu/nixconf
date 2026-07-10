@@ -3,7 +3,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, Gdk, GdkPixbuf, Pango
 import os, sys, subprocess, getpass, threading, re, shutil, json
 
-GLib.set_prgname("niri-setup")
+GLib.set_prgname("mojo-setup")
 
 CSS = b"""
 window {
@@ -32,6 +32,7 @@ entry:focus { border-color: #555; box-shadow: none; }
 .status-text { font-size:14px; }
 .done-icon { font-size:48px; }
 .entry-error { border-color:#e74c3c; border-width:1.5px; }
+.entry-ph { color: #6a6a72; }
 .tile { border-radius:12px; padding:6px 2px; border:2px solid transparent; background:rgba(255,255,255,0.03); }
 .tile:hover { border-color:#555; background:rgba(255,255,255,0.06); }
 .tile-done { border-color:#2ecc71; }
@@ -49,28 +50,72 @@ def load_css():
     p.load_from_data(CSS)
     Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), p, 600)
 
+class PlaceholderEntry(Gtk.Overlay):
+    # ponytail: native GTK placeholder hides on focus; this keeps it until typing
+    def __init__(self, placeholder="", secret=False, text="", width_chars=0):
+        super().__init__()
+        self._ph_lbl = Gtk.Label(xalign=0)
+        self._ph_lbl.set_margin_start(9)
+        self._ph_lbl.set_margin_top(2)
+        self._ph_lbl.set_can_focus(False)
+        self._ph_lbl.set_events(0)
+        self._ph_lbl.set_no_show_all(True)
+        self._ph_lbl.get_style_context().add_class("entry-ph")
+        self._ph_lbl.set_text(placeholder)
+        self.add_overlay(self._ph_lbl)
+        self.set_overlay_pass_through(self._ph_lbl, True)
+
+        self.entry = Gtk.Entry()
+        self.entry.set_hexpand(True)
+        if width_chars:
+            self.entry.set_width_chars(width_chars)
+        self.entry.set_visibility(not secret)
+        if text:
+            self.entry.set_text(text)
+        self.add(self.entry)
+
+        self.entry.connect("changed", self._sync)
+        # ponytail: keep placeholder during IME composition; only hide on committed text
+        self.entry.connect("preedit-changed", self._sync)
+        self._sync()
+
+    def _sync(self, *a):
+        # ponytail: hide()/show() fully removes the overlay child so it can't
+        # linger drawn over the text after data is loaded
+        if self.entry.get_text() == "":
+            self._ph_lbl.show()
+        else:
+            self._ph_lbl.hide()
+
+    def get_text(self):
+        return self.entry.get_text()
+
+    def set_text(self, t):
+        self.entry.set_text(t)
+        self._sync()
+
+    def set_placeholder(self, t):
+        self._ph_lbl.set_text(t)
+
+    def set_visibility(self, v):
+        self.entry.set_visibility(v)
+
+    def set_width_chars(self, n):
+        self.entry.set_width_chars(n)
+
+    def set_icon_from_icon_name(self, pos, name):
+        self.entry.set_icon_from_icon_name(pos, name)
+
+    def connect(self, *a, **k):
+        return self.entry.connect(*a, **k)
+
 NIXCONF = os.path.expanduser("~/nixconf")
 USER_CONFIG = os.path.join(NIXCONF, "user-config")
 
-def _dict_to_nix(d, indent=0):
-    pad = "  " * indent
-    inner = "  " * (indent + 1)
-    items = []
-    for k, v in d.items():
-        if isinstance(v, bool):
-            items.append(f"{inner}{k} = {'true' if v else 'false'};")
-        elif isinstance(v, str):
-            v = v.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
-            items.append(f'{inner}{k} = "{v}";')
-        elif v is None:
-            items.append(f"{inner}{k} = null;")
-        elif isinstance(v, (int, float)):
-            items.append(f"{inner}{k} = {v};")
-    return "{\n" + "\n".join(items) + f"\n{pad}}}"
-
 class SetupWizard(Gtk.Window):
-    def __init__(self):
+    def __init__(self, page=None):
         super().__init__(decorated=False, title="mujō Setup")
+        self.single_page = page  # ponytail: non-None => open/apply only this page
         self.set_default_size(624, 576)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
@@ -96,8 +141,59 @@ class SetupWizard(Gtk.Window):
         self.persist_enabled = False
         self._nixconf = os.path.expanduser("~/nixconf")
         self._secrets = os.path.join(self._nixconf, "secrets")
+        # ponytail: the TPM-sealed blob lives in tmpfs (/run/sops-age) and is
+        # gone after reboot/idle. Restore it from the persisted copy so sops
+        # decryption (used to reload saved data on reopen) works without a full
+        # reboot. The blob is TPM-locked — restoring it is not exposing a secret.
+        self._ensure_age_key()
         self._existing = self._load_existing_config()
         self._build()
+
+    def _ensure_age_key(self):
+        key_path = "/run/sops-age/keys.txt"
+        persist = os.path.expanduser("~/sops-age/keys.txt")
+        if os.path.isfile(key_path):
+            # ponytail: on reboot sops-age-restore (root) may have dropped a
+            # root:600 file here. The wizard runs as the user, so make sure we
+            # can actually read it for sops --decrypt (autofill), otherwise it
+            # silently fails.
+            try:
+                if not os.access(key_path, os.R_OK):
+                    subprocess.run(
+                        ["pkexec", "chown", getpass.getuser(), key_path],
+                        check=True,
+                    )
+                    subprocess.run(
+                        ["pkexec", "chmod", "600", key_path],
+                        check=True,
+                    )
+            except Exception as e:
+                print(f"[SETUP] WARN: could not fix age key perms: {e}")
+            return
+        if not os.path.isfile(persist):
+            return
+        try:
+            subprocess.run(
+                ["pkexec", "mkdir", "-p", "/run/sops-age"],
+                check=True,
+            )
+            subprocess.run(
+                ["pkexec", "cp", persist, "/run/sops-age/keys.txt"],
+                check=True,
+            )
+            # ponytail: the wizard (and sops decrypt) run as the user, so the
+            # restored key must be owned by the user — otherwise a root:600 file
+            # is unreadable and autofill (sops --decrypt) silently fails after reboot
+            subprocess.run(
+                ["pkexec", "chown", getpass.getuser(), "/run/sops-age/keys.txt"],
+                check=True,
+            )
+            subprocess.run(
+                ["pkexec", "chmod", "600", "/run/sops-age/keys.txt"],
+                check=True,
+            )
+        except Exception as e:
+            print(f"[SETUP] WARN: could not restore age key for reload: {e}")
 
     def _build(self):
         load_css()
@@ -171,16 +267,58 @@ class SetupWizard(Gtk.Window):
         bb.pack_end(self.btn_next, False, False, 0)
         vbox.pack_end(bb, False, False, 0)
 
-        self._show("welcome")
+        # ponytail: stack won't honor set_visible_child_name before realize;
+        # defer the initial page switch until after the window is mapped
+        if self.single_page:
+            GLib.idle_add(lambda: self._show(self.single_page) or False)
+        else:
+            GLib.idle_add(lambda: self._show(self._first_page()) or False)
+
+    def _first_page(self):
+        name = "welcome"
+        # ponytail: skip every page that's already complete, from startup
+        while True:
+            if name == "welcome" and self._passwd_exists():
+                name = "browser"
+            elif name == "browser" and self.pg_browser.all_installed():
+                name = "social"
+            elif name == "social" and self.pg_social.all_installed():
+                name = "sops"
+            elif name == "sops" and self.pg_sops.all_installed():
+                name = "connection"
+            elif name == "connection" and not self._age_key_present():
+                name = "github"
+            else:
+                break
+        return name
+
+    def _passwd_exists(self):
+        if os.path.isfile("/persist/passwd"):
+            return True
+        try:
+            r = subprocess.run(
+                ["sudo", "-n", "test", "-f", "/persist/passwd"],
+                capture_output=True, timeout=5,
+            )
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    def _age_key_present(self):
+        # ponytail: in-session key or persisted key file both count
+        if self.sops_age_key:
+            return True
+        return self.pg_sops.all_installed()
 
     def _load_existing_config(self):
         cfg = {}
         conf_dir = os.path.join(os.environ.get("XDG_CONFIG_HOME",
-                                 os.path.expanduser("~/.config")), "niri-setup")
+                                 os.path.expanduser("~/.config")), "mojo-setup")
         github = self._load_encrypted_json(os.path.join(conf_dir, "github.json"))
         if github:
             cfg["github"] = github
-        connection = self._load_encrypted_json(os.path.join(conf_dir, "connection.json"))
+        connection = self._load_encrypted_json(
+            os.path.join(self._nixconf, "secrets", "connection.json"))
         if connection:
             cfg["connection"] = connection
         persist_path = os.path.join(conf_dir, "persist-backup.json")
@@ -200,43 +338,78 @@ class SetupWizard(Gtk.Window):
         return cfg
 
     def _load_encrypted_json(self, path):
+        # ponytail: tolerate a {"data": "<json>"} envelope (older/mis-shaped saves)
+        def _unwrap(obj):
+            if isinstance(obj, dict) and list(obj.keys()) == ["data"] and isinstance(obj["data"], str):
+                try:
+                    return _unwrap(json.loads(obj["data"]))
+                except Exception:
+                    return obj
+            return obj
         try:
+            # ponytail: point sops at the TPM-sealed key in tmpfs; otherwise it
+            # falls back to default age key locations and fails to decrypt.
+            env = dict(os.environ, SOPS_AGE_KEY_FILE="/run/sops-age/keys.txt")
             r = subprocess.run(
                 ["sops", "--decrypt", path],
-                capture_output=True, timeout=10,
+                capture_output=True, timeout=10, env=env,
             )
             if r.returncode == 0:
-                return json.loads(r.stdout)
+                return _unwrap(json.loads(r.stdout))
         except Exception:
             pass
         if os.path.isfile(path):
             try:
                 with open(path) as f:
-                    return json.load(f)
+                    return _unwrap(json.load(f))
             except Exception:
                 pass
         return None
 
-    def _save_encrypted_json(self, path, data, age_pubkey=None):
-        pk = age_pubkey or self.sops_pubkey
+    def _age_pubkey(self):
+        # ponytail: derive the recipient from the age key file so encryption
+        # never depends on in-session wizard state (avoids plaintext leaks)
+        if self.sops_pubkey:
+            return self.sops_pubkey
+        key_path = "/run/sops-age/keys.txt"  # ponytail: tmpfs, never on disk
+        if os.path.isfile(key_path):
+            try:
+                with open(key_path) as f:
+                    return self.pg_sops._extract_pubkey(f.read())
+            except Exception:
+                pass
+        return None
+
+    def _save_encrypted_json(self, path, data):
+        pk = self._age_pubkey()
         if not pk:
-            with open(path, "w") as f:
-                json.dump(data, f)
-            return
+            raise RuntimeError("No age public key available — cannot encrypt secrets")
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
-            json.dump(data, f)
+            if isinstance(data, (dict, list)):
+                json.dump(data, f)
+            else:
+                f.write(str(data))
         try:
             r = subprocess.run(
-                ["sops", "--encrypt", "--age", pk, "-o", path, tmp],
+                ["sops", "--encrypt", "--age", pk, tmp],
                 capture_output=True, timeout=10,
             )
             if r.returncode == 0:
+                with open(path, "wb") as f:
+                    f.write(r.stdout)
                 os.unlink(tmp)
                 return
+            raise RuntimeError(f"sops encrypt failed: {r.stderr.decode(errors='replace')}")
+        except subprocess.CalledProcessError:
+            raise
+        except RuntimeError:
+            raise
         except Exception as e:
-            print(f"[SETUP] sops encrypt error: {e}")
-        os.replace(tmp, path)
+            raise RuntimeError(f"sops encrypt error: {e}") from e
+        finally:
+            if os.path.isfile(tmp):
+                os.unlink(tmp)
 
     def _on_draw_background(self, widget, cr):
         cr.set_source_rgba(34/255, 35/255, 45/255, 0.8)
@@ -250,6 +423,12 @@ class SetupWizard(Gtk.Window):
                 return
             if name == "social" and self.pg_social.all_installed():
                 self._show("sops")
+                return
+            if name == "sops" and self.pg_sops.all_installed():
+                self._show("connection")
+                return
+            if name == "connection" and not self._age_key_present():
+                self._show("github")
                 return
         self.stack.set_visible_child_name(name)
         self._update_buttons()
@@ -277,11 +456,22 @@ class SetupWizard(Gtk.Window):
     def _update_buttons(self):
         n = self.stack.get_visible_child_name()
         selection = ("browser", "social", "sops", "connection", "github", "token", "persist")
-        self.btn_back.set_visible(n in selection)
-        self.btn_skip.set_visible(n in ("browser", "social", "sops", "connection", "token", "persist"))
+        # ponytail: no Back on the first reachable page (whatever it is)
+        self.btn_back.set_visible(n in selection and n != self._first_page())
+        self.btn_skip.set_visible(n in ("browser", "social", "sops", "token", "persist"))
         self.btn_next.set_visible(n in ("welcome", *selection, "done"))
         self.btn_cancel.set_visible(n in ("welcome", *selection))
-        if n == "persist":
+        if self.single_page:
+            # single-page mode: only this page, apply directly
+            self.btn_back.set_visible(False)
+            self.btn_skip.set_visible(False)
+            if n == "done":
+                # ponytail: applying finished → offer a close, not another apply
+                self.btn_next.set_label("_Close")
+                self.btn_cancel.set_visible(False)
+            else:
+                self.btn_next.set_label("_Apply")
+        elif n == "persist":
             self.btn_next.set_label("A_pply")
         elif n == "done":
             self.btn_next.set_label("_Finish")
@@ -303,6 +493,12 @@ class SetupWizard(Gtk.Window):
 
     def _on_next(self):
         n = self.stack.get_visible_child_name()
+        if self.single_page:
+            # ponytail: capture this page's result, then apply just that
+            self._capture_page(n)
+            self._show("apply")
+            GLib.idle_add(self._do_apply)
+            return
         if n == "welcome":
             ok, msg = self.pg_welcome.validate()
             if not ok:
@@ -353,6 +549,30 @@ class SetupWizard(Gtk.Window):
         elif n == "done":
             self._on_cancel()
 
+    def _capture_page(self, n):
+        # ponytail: pull a single page's result into wizard state for isolated apply
+        if n == "welcome":
+            self.passwd = self.pg_welcome.pw
+            self.pg_welcome.save_face()
+        elif n == "browser":
+            r = self.pg_browser.get_selected()
+            if r:
+                self.browser_id, self.browser_label = r
+        elif n == "social":
+            r = self.pg_social.get_selected()
+            if r:
+                self.social_id, self.social_label = r
+        elif n == "sops":
+            self.sops_age_key, self.sops_pubkey = self.pg_sops.get_result()
+        elif n == "connection":
+            self.connection_data = self.pg_connection.get_result()
+        elif n == "github":
+            self.github_repo = self.pg_github.get_result() or ""
+        elif n == "token":
+            self.github_token = self.pg_token.get_result()
+        elif n == "persist":
+            self.persist_enabled = self.pg_persist.get_result()
+
     def _err(self, msg):
         d = Gtk.MessageDialog(transient_for=self, flags=0,
                               message_type=Gtk.MessageType.ERROR,
@@ -368,10 +588,12 @@ class SetupWizard(Gtk.Window):
         prev = {"browser": "welcome", "social": "browser", "sops": "social", "connection": "sops", "github": "connection", "token": "github", "persist": "token"}
         target = prev.get(n, "welcome")
         # Skip back past pages with nothing to choose
-        while target in ("browser", "social"):
+        while target in ("browser", "social", "sops"):
             if target == "browser" and self.pg_browser.all_installed():
                 target = prev.get(target, "welcome")
             elif target == "social" and self.pg_social.all_installed():
+                target = prev.get(target, "welcome")
+            elif target == "sops" and self.pg_sops.all_installed():
                 target = prev.get(target, "welcome")
             else:
                 break
@@ -407,19 +629,44 @@ class SetupWizard(Gtk.Window):
         t.start()
 
     def _apply_worker(self):
-        print("[SETUP] Setting password")
-        self.pg_apply.update("Setting password\u2026", False)
-        p = subprocess.run(
-            ["sudo", "-S", "chpasswd"],
-            input=f"{getpass.getuser()}:{self.passwd}",
-            capture_output=True, text=True,
-        )
-        if p.returncode != 0:
-            self.pg_apply.update("Failed to set password", True)
-            print("[SETUP] FAILED: password")
-            return
-        self.pg_apply.update("Password set", False)
-        print("[SETUP] Password set")
+        # ponytail: skipped account setup leaves passwd empty; don't clobber /persist/passwd
+        if self.passwd:
+            print("[SETUP] Setting password")
+            self.pg_apply.update("Setting password\u2026", False)
+            import random, string
+            salt = "".join(random.choices(string.ascii_letters + string.digits, k=16))
+            h = subprocess.run(
+                ["mkpasswd", "-m", "sha-512", "-S", salt, self.passwd],
+                capture_output=True, text=True,
+            )
+            if h.returncode != 0:
+                self.pg_apply.update("Failed to hash password", True)
+                print("[SETUP] FAILED: mkpasswd")
+                return
+            hashed = h.stdout.strip()
+            # persist the hash so NixOS hashedPasswordFile picks it up on next boot
+            w = subprocess.run(
+                ["pkexec", "tee", "/persist/passwd"],
+                input=hashed + "\n", capture_output=True, text=True,
+            )
+            if w.returncode != 0:
+                self.pg_apply.update("Failed to save password file", True)
+                print("[SETUP] FAILED: write /persist/passwd")
+                return
+            # also set it live for the current session (encrypted form)
+            p = subprocess.run(
+                ["sudo", "-S", "chpasswd", "-e"],
+                input=f"{getpass.getuser()}:{hashed}",
+                capture_output=True, text=True,
+            )
+            if p.returncode != 0:
+                self.pg_apply.update("Failed to set password", True)
+                print("[SETUP] FAILED: password")
+                return
+            self.pg_apply.update("Password set", False)
+            print("[SETUP] Password set")
+        else:
+            print("[SETUP] Skipping password (account already configured)")
 
         if self.browser_id:
             print(f"[SETUP] Installing {self.browser_id}...")
@@ -462,30 +709,50 @@ class SetupWizard(Gtk.Window):
         if self.sops_age_key:
             print("[SETUP] Setting up SOPS age key...")
             self.pg_apply.update("Setting up SOPS age key\u2026", False)
-            key_dir = os.path.expanduser("~/.config/sops/age")
-            os.makedirs(key_dir, exist_ok=True)
-            key_path = os.path.join(key_dir, "keys.txt")
+            # ponytail: write the key to tmpfs (/run/sops-age) for immediate use
+            # — RAM only, never on disk.
+            key_dir = "/run/sops-age"
+            key_path = "/run/sops-age/keys.txt"
             try:
-                with open(key_path, "w") as f:
-                    f.write(self.sops_age_key)
-                if self.sops_pubkey:
-                    sops_yaml = f"""keys:
-  - &user {self.sops_pubkey}
-creation_rules:
-  - path_regex: secrets/.*$
-    key_groups:
-      - age:
-          - *user
-"""
-                    repo_yaml = os.path.join(os.path.expanduser("~/nixconf"), ".sops.yaml")
-                    with open(repo_yaml, "w") as f:
-                        f.write(sops_yaml)
-                self.pg_apply.update("SOPS encryption configured", False)
-                print("[SETUP] SOPS configured")
-            except Exception as e:
-                self.pg_apply.update(f"SOPS setup failed: {e}", True)
-                print(f"[SETUP] FAILED: SOPS {e}")
+                subprocess.run(
+                    ["pkexec", "sh", "-c", f"mkdir -p {key_dir} && cat > {key_path}"],
+                    input=self.sops_age_key.encode(),
+                    check=True,
+                )
+            except Exception:
+                self._show_error_dialog(
+                    "Could not write the age key to /run/sops-age (tmpfs).\n\n"
+                    "Make sure pkexec/polkit is available and you grant "
+                    "the permission prompt."
+                )
                 return
+            # ponytail: ONLY a TPM-sealed identity (AGE-PLUGIN-TPM-...) may be
+            # persisted — it's TPM-locked ciphertext, inert without the hardware,
+            # so it is not a stored secret. A software AGE-SECRET-KEY is plaintext
+            # and MUST NOT touch /persist (physical disk); in that case we keep it
+            # in RAM and skip the disk copy entirely (autofill won't survive reboot,
+            # but no plaintext secret is ever written to disk).
+            if self.pg_sops._persistable:
+                persist_dir = os.path.expanduser("~/sops-age")
+                os.makedirs(persist_dir, exist_ok=True)
+                with open(os.path.join(persist_dir, "keys.txt"), "w") as f:
+                    f.write(self.sops_age_key)
+            else:
+                print("[SETUP] Software key — NOT persisting to disk (plaintext)")
+            if self.sops_pubkey:
+                sops_yaml = f"""keys:
+   - &user {self.sops_pubkey}
+creation_rules:
+   - path_regex: secrets/.*$
+     key_groups:
+       - age:
+           - *user
+"""
+                repo_yaml = os.path.join(os.path.expanduser("~/nixconf"), ".sops.yaml")
+                with open(repo_yaml, "w") as f:
+                    f.write(sops_yaml)
+            self.pg_apply.update("SOPS encryption configured", False)
+            print("[SETUP] SOPS configured")
         else:
             self.pg_apply.update("Skipped SOPS setup", False)
             print("[SETUP] Skipped SOPS setup")
@@ -493,14 +760,20 @@ creation_rules:
         if self.connection_data:
             print("[SETUP] Saving connection config...")
             self.pg_apply.update("Saving connection config\u2026", False)
-            conf_dir = os.path.join(os.environ.get("XDG_CONFIG_HOME",
-                                     os.path.expanduser("~/.config")), "niri-setup")
-            os.makedirs(conf_dir, exist_ok=True)
+            secret_dir = os.path.join(self._nixconf, "secrets")
+            os.makedirs(secret_dir, exist_ok=True)
             try:
                 self._save_encrypted_json(
-                    os.path.join(conf_dir, "connection.json"),
+                    os.path.join(secret_dir, "connection.json"),
                     self.connection_data,
                 )
+                # ponytail: public halves live in clear so services (git, ssh
+                # known_hosts, etc.) can read them without sops decryption
+                public = {k: v for k, v in self.connection_data.items()
+                          if k.endswith("_public")}
+                if public:
+                    with open(os.path.join(secret_dir, "public.json"), "w") as f:
+                        json.dump(public, f)
                 self.pg_apply.update("Connection config saved (encrypted)", False)
                 print("[SETUP] Connection config saved (encrypted)")
             except Exception as e:
@@ -511,42 +784,31 @@ creation_rules:
             self.pg_apply.update("Skipped connection setup", False)
             print("[SETUP] Skipped connection setup")
 
-        # Write user-config files for Nix to consume at build time
-        try:
-            os.makedirs(USER_CONFIG, exist_ok=True)
-            username = "yurii"
-            with open(os.path.join(USER_CONFIG, "_user.nix"), "w") as f:
-                f.write('{ name = "%s"; }\n' % username)
-            connection_data = self.connection_data or {}
-            conn_fields = {"git_user", "git_email", "hostname", "wifi_ssid", "wifi_password", "tailscale"}
-            nix_conn = {k: v for k, v in connection_data.items() if k in conn_fields}
-            with open(os.path.join(USER_CONFIG, "_connection.nix"), "w") as f:
-                f.write(_dict_to_nix(nix_conn) + "\n")
-            git_data = {
-                "name": connection_data.get("git_user", connection_data.get("name", "User")),
-                "email": connection_data.get("git_email", connection_data.get("email", "user@email.com")),
-            }
-            with open(os.path.join(USER_CONFIG, "_git.nix"), "w") as f:
-                f.write(_dict_to_nix(git_data) + "\n")
-            api_keys = {k: v for k, v in connection_data.items() if k in ("openai", "anthropic", "gemini", "openrouter") and v}
-            if api_keys:
-                persist_api = os.path.join("/persist", "openrouterapi")
-                or_key = api_keys.get("openrouter")
-                if or_key:
-                    os.makedirs(os.path.dirname(persist_api), exist_ok=True)
-                    with open(persist_api, "w") as f:
-                        f.write(or_key.strip())
-                with open(os.path.join(USER_CONFIG, "api-keys.nix"), "w") as f:
-                    f.write(_dict_to_nix(api_keys) + "\n")
-            print("[SETUP] User config written to ~/nixconf/user-config/")
-        except Exception as e:
-            print(f"[SETUP] WARNING: Failed to write user-config: {e}")
+        # ponytail: git identity is written ENCRYPTED (secrets/git-config),
+        # never as plaintext. Consumed by sops-nix -> ~/.config/git/config.
+        cd = self.connection_data or {}
+        git_name = cd.get("git_user", cd.get("name", ""))
+        git_email = cd.get("git_email", cd.get("email", ""))
+        if git_name or git_email:
+            try:
+                secret_dir = os.path.join(self._nixconf, "secrets")
+                os.makedirs(secret_dir, exist_ok=True)
+                ini = "[user]\n"
+                if git_name:
+                    ini += f"  name = {git_name}\n"
+                if git_email:
+                    ini += f"  email = {git_email}\n"
+                self._save_encrypted_json(
+                    os.path.join(secret_dir, "git-config"), ini)
+                print("[SETUP] Git identity saved (encrypted)")
+            except Exception as e:
+                print(f"[SETUP] WARNING: Failed to save git identity: {e}")
 
         if self.github_repo and self.github_token:
             print(f"[SETUP] Saving GitHub config for {self.github_repo}...")
             self.pg_apply.update("Saving GitHub config\u2026", False)
             conf_dir = os.path.join(os.environ.get("XDG_CONFIG_HOME",
-                                     os.path.expanduser("~/.config")), "niri-setup")
+                                     os.path.expanduser("~/.config")), "mojo-setup")
             os.makedirs(conf_dir, exist_ok=True)
             try:
                 self._save_encrypted_json(
@@ -567,7 +829,7 @@ creation_rules:
             print(f"[SETUP] Saving persistent backup config...")
             self.pg_apply.update("Saving backup config\u2026", False)
             conf_dir = os.path.join(os.environ.get("XDG_CONFIG_HOME",
-                                     os.path.expanduser("~/.config")), "niri-setup")
+                                     os.path.expanduser("~/.config")), "mojo-setup")
             os.makedirs(conf_dir, exist_ok=True)
             try:
                 with open(os.path.join(conf_dir, "persist-backup.json"), "w") as f:
@@ -584,7 +846,7 @@ creation_rules:
 
         flag = os.path.join(os.environ.get("XDG_CACHE_HOME",
                                            os.path.expanduser("~/.cache")),
-                            "niri-setup-done")
+                            "mojo-setup-done")
         os.makedirs(os.path.dirname(flag), exist_ok=True)
         open(flag, "w").close()
 
@@ -749,14 +1011,11 @@ class WelcomePage(Gtk.Box):
         gf.set_halign(Gtk.Align.CENTER)
 
         def mk_entry(placeholder, visibility, show_toggle=False):
-            e = Gtk.Entry()
-            e.set_placeholder_text(placeholder)
-            e.set_visibility(visibility)
-            e.set_width_chars(34)
+            e = PlaceholderEntry(placeholder=placeholder, secret=not visibility, width_chars=34)
             if show_toggle:
                 e.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "view-reveal-symbolic")
                 e.connect("icon-press", self._toggle_visibility)
-                e._visible = False
+                e.entry._visible = False
             return e
 
         self.pw_entry = mk_entry("Password", False, show_toggle=True)
@@ -784,7 +1043,7 @@ class WelcomePage(Gtk.Box):
         return len(pw) > 0 and pw == cf
 
     def _toggle_visibility(self, entry, pos, *a):
-        entry._visible = not entry._visible
+        entry._visible = not getattr(entry, "_visible", False)
         entry.set_visibility(entry._visible)
         entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
                                       "view-conceal-symbolic" if entry._visible else "view-reveal-symbolic")
@@ -1123,6 +1382,7 @@ class SopsPage(Gtk.Box):
         self.wiz = wiz
         self._age_key = ""
         self._pubkey = ""
+        self._persistable = False
         self.set_margin_start(28)
         self.set_margin_end(28)
         self.set_margin_top(8)
@@ -1159,7 +1419,7 @@ class SopsPage(Gtk.Box):
         self._check()
 
     def _check(self):
-        key_path = os.path.expanduser("~/.config/sops/age/keys.txt")
+        key_path = "/run/sops-age/keys.txt"  # ponytail: tmpfs keyFile
         if os.path.isfile(key_path):
             # ponytail: file exists → key is present, disable generate button
             self.gen_btn.set_sensitive(False)
@@ -1185,6 +1445,11 @@ class SopsPage(Gtk.Box):
         self._age_key = ""
         self._pubkey = ""
 
+    def all_installed(self):
+        # ponytail: key already present → nothing to do on this page
+        key_path = "/run/sops-age/keys.txt"  # ponytail: tmpfs keyFile
+        return os.path.isfile(key_path)
+
     def _extract_pubkey(self, age_key):
         for line in age_key.splitlines():
             if line.startswith("# public key: "):
@@ -1192,6 +1457,42 @@ class SopsPage(Gtk.Box):
         return ""
 
     def _generate(self, *a):
+        # ponytail: the ONLY key form safe to persist to disk is a TPM-sealed
+        # identity (AGE-PLUGIN-TPM-...) — it's TPM-locked ciphertext, inert
+        # without the hardware. A software AGE-SECRET-KEY is plaintext and must
+        # NEVER be written to /persist. Track that with self._persistable.
+        self._persistable = False
+        try:
+            import tempfile
+            with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+                id_path = tf.name
+            r = subprocess.run(
+                ["age-plugin-tpm", "--generate", "-o", id_path],
+                capture_output=True, text=True, timeout=30,
+            )
+            if r.returncode == 0 and os.path.getsize(id_path) > 0:
+                with open(id_path) as f:
+                    self._age_key = f.read().strip()
+                ry = subprocess.run(
+                    ["age-plugin-tpm", "-y", id_path],
+                    capture_output=True, text=True, timeout=10,
+                )
+                self._pubkey = ry.stdout.strip().splitlines()[0] if ry.returncode == 0 else ""
+                os.unlink(id_path)
+                self._persistable = True
+                self.lock_lbl.set_markup(
+                    "<span foreground='#4CAF50' size='xx-large'>\U0001f512</span>"
+                )
+                self.status_lbl.set_markup("<b>TPM-sealed key generated</b>")
+                self.gen_btn.set_sensitive(False)
+                return
+            os.unlink(id_path)
+        except FileNotFoundError:
+            pass  # fall through to software age-keygen
+
+        # ponytail: software fallback. Works in-memory for this session, but the
+        # plaintext key may NOT be persisted to disk — so mark non-persistable
+        # and warn. The caller skips the disk write when _persistable is False.
         try:
             r = subprocess.run(
                 ["age-keygen"],
@@ -1205,7 +1506,11 @@ class SopsPage(Gtk.Box):
             self.lock_lbl.set_markup(
                 "<span foreground='#4CAF50' size='xx-large'>\U0001f512</span>"
             )
-            self.status_lbl.set_markup("<b>Key generated</b>")
+            self.status_lbl.set_markup(
+                "<span foreground='#e6a23c'><b>Software key (not sealed)</b></span>\n"
+                "TPM unavailable — this key is plaintext and will NOT be saved.\n"
+                "Secrets stay encrypted in RAM only; regenerate after a reboot."
+            )
             self.gen_btn.set_sensitive(False)
         except FileNotFoundError:
             self.status_lbl.set_markup(
@@ -1229,26 +1534,24 @@ class ConnectionPage(Gtk.Box):
         "openrouter": "network-vpn",
         "git": "git",
         "hostname": "computer",
-        "wifi_ssid": "network-wireless",
-        "wifi_password": "network-wireless",
+        "wifi": "network-wireless",
         "tailscale": "network-vpn",
     }
 
     ITEMS = [
-        ("mullvad",       "Mullvad",       False, False),
-        ("ssh",           "SSH",           False, False),
-        ("gpg",           "GPG",           False, False),
-        ("openpgp",       "OpenPGP",       False, False),
-        ("signify",       "Signify",       False, False),
-        ("openai",        "OpenAI",        True,  False),
-        ("anthropic",     "Anthropic",     True,  False),
-        ("gemini",        "Gemini",        True,  False),
-        ("openrouter",    "OpenRouter",    True,  False),
-        ("git",           "Git",           False, False),
-        ("hostname",      "Hostname",      False, False),
-        ("wifi_ssid",     "WiFi SSID",     False, False),
-        ("wifi_password", "WiFi pass",     True,  False),
-        ("tailscale",     "Tailscale",     False, True),
+        ("mullvad",       "Mullvad",       False, False, "Network / VPN"),
+        ("tailscale",     "Tailscale",     False, True,  "Network / VPN"),
+        ("wifi",          "WiFi",          False, False, "Network / VPN"),
+        ("ssh",           "SSH",           False, False, "Keys / Identity"),
+        ("gpg",           "GPG",           False, False, "Keys / Identity"),
+        ("openpgp",       "OpenPGP",       False, False, "Keys / Identity"),
+        ("signify",       "Signify",       False, False, "Keys / Identity"),
+        ("openai",        "OpenAI",        True,  False, "AI API Keys"),
+        ("anthropic",     "Anthropic",     True,  False, "AI API Keys"),
+        ("gemini",        "Gemini",        True,  False, "AI API Keys"),
+        ("openrouter",    "OpenRouter",    True,  False, "AI API Keys"),
+        ("git",           "Git",           False, False, "System"),
+        ("hostname",      "Hostname",      False, False, "System"),
     ]
 
     def __init__(self, wiz):
@@ -1277,23 +1580,91 @@ class ConnectionPage(Gtk.Box):
         outer.set_margin_top(10)
         sw.add(outer)
 
-        grid = Gtk.Grid(row_spacing=8, column_spacing=8)
-        grid.set_halign(Gtk.Align.CENTER)
-        outer.pack_start(grid, False, False, 0)
-        outer.pack_start(Gtk.Box(), True, True, 0)
-
         self.values = {}
         self.tiles = {}
         self.buttons = {}
         self.status_lbls = {}
-        self.checkmarks = {}
         COLS = 4
 
-        for i, (key, label, secret, toggle) in enumerate(self.ITEMS):
-            r, c = divmod(i, COLS)
-            tile = self._make_tile(key, label, toggle)
-            grid.attach(tile, c, r, 1, 1)
-            self.tiles[key] = tile
+        # ponytail: group items by section, render a header above each grid
+        sections = []
+        for (key, label, secret, toggle, section) in self.ITEMS:
+            if not sections or sections[-1][0] != section:
+                sections.append((section, []))
+            sections[-1][1].append((key, label, secret, toggle))
+
+        for section_name, items in sections:
+            hdr = Gtk.Label(xalign=0.5)
+            hdr.set_markup(f"<span size='large' weight='bold' color='#aaa'>{section_name}</span>")
+            hdr.set_margin_top(14)
+            hdr.set_margin_bottom(4)
+            outer.pack_start(hdr, False, False, 0)
+
+            grid = Gtk.Grid(row_spacing=8, column_spacing=8)
+            grid.set_halign(Gtk.Align.CENTER)
+            outer.pack_start(grid, False, False, 0)
+
+            for i, (key, label, secret, toggle) in enumerate(items):
+                r, c = divmod(i, COLS)
+                tile = self._make_tile(key, label, toggle)
+                grid.attach(tile, c, r, 1, 1)
+                self.tiles[key] = tile
+
+        outer.pack_start(Gtk.Box(), True, True, 0)
+
+        # ponytail: toggle whether encrypted secrets/ is committed to git
+        # (gitignored by default; uncheck = keep out of the repo)
+        self.secrets_in_git = Gtk.CheckButton(
+            label="_Commit encrypted secrets to the repo", use_underline=True)
+        self.secrets_in_git.set_active(self._secrets_are_tracked())
+        self.secrets_in_git.set_margin_top(10)
+        self.secrets_in_git.set_halign(Gtk.Align.CENTER)
+        self.secrets_in_git.connect("toggled", self._on_secrets_toggle)
+        self.pack_start(self.secrets_in_git, False, False, 0)
+
+        # ponytail: pre-fill from the saved encrypted connection on reopen so
+        # the wizard shows previously entered data instead of blank tiles.
+        existing = self.wiz._existing.get("connection") or {}
+        if isinstance(existing, dict):
+            for k, v in existing.items():
+                if v not in (None, ""):
+                    self.values[k] = v
+            # ponytail: tailscale is a bool toggle, not a string value
+            if existing.get("tailscale") is True:
+                self.values["tailscale"] = True
+            for key in self.tiles:
+                self._update_tile(key)
+
+    def _gitignore_path(self):
+        return os.path.join(self.wiz._nixconf, ".gitignore")
+
+    def _secrets_are_tracked(self):
+        # ponytail: tracked means NOT ignored by .gitignore
+        p = self._gitignore_path()
+        if not os.path.isfile(p):
+            return True
+        try:
+            with open(p) as f:
+                return "secrets/*" not in f.read()
+        except Exception:
+            return True
+
+    def _on_secrets_toggle(self, btn):
+        tracked = btn.get_active()
+        p = self._gitignore_path()
+        try:
+            lines = []
+            if os.path.isfile(p):
+                with open(p) as f:
+                    lines = f.read().splitlines()
+            lines = [l for l in lines if l.strip() not in ("secrets/*", "!secrets/.gitkeep")]
+            if not tracked:
+                lines.append("secrets/*")
+                lines.append("!secrets/.gitkeep")
+            with open(p, "w") as f:
+                f.write("\n".join(lines).strip() + "\n")
+        except Exception as e:
+            print(f"[SETUP] failed to update .gitignore: {e}")
 
     def _make_tile(self, key, label, is_toggle):
         btn = Gtk.Button()
@@ -1324,16 +1695,6 @@ class ConnectionPage(Gtk.Box):
         overlay = Gtk.Overlay()
         overlay.add(btn)
 
-        check = Gtk.Label()
-        check.set_markup("<span foreground='#2ecc71' size='x-large'>\u2713</span>")
-        check.set_valign(Gtk.Align.START)
-        check.set_halign(Gtk.Align.END)
-        check.set_margin_top(3)
-        check.set_margin_end(3)
-        check.set_no_show_all(True)
-        overlay.add_overlay(check)
-        self.checkmarks[key] = check
-
         btn.connect("clicked", lambda b, k=key: self._on_tile_click(k))
         return overlay
 
@@ -1345,10 +1706,16 @@ class ConnectionPage(Gtk.Box):
         if key == "git":
             self._edit_git()
             return
+        if key == "wifi":
+            self._edit_wifi()
+            return
+        if key == "ssh":
+            self._edit_ssh()
+            return
         item = next((x for x in self.ITEMS if x[0] == key), None)
         if not item:
             return
-        _, label, secret, _ = item
+        _, label, secret, _, _ = item
         self._edit_dialog(key, label, secret)
 
     def _update_tile(self, key):
@@ -1358,11 +1725,9 @@ class ConnectionPage(Gtk.Box):
             if self.values.get("tailscale"):
                 ctx.add_class("tile-on")
                 self._set_tile_status(key, "On")
-                self.checkmarks[key].show()
             else:
                 ctx.remove_class("tile-on")
                 self._set_tile_status(key, "Off")
-                self.checkmarks[key].hide()
             return
         if key == "git":
             name = self.values.get("git_user", "")
@@ -1372,6 +1737,15 @@ class ConnectionPage(Gtk.Box):
                 self._set_tile_status(key, name[:12] + ("\u2026" if len(name) > 12 else ""))
             else:
                 self._set_tile_status(key, name or "")
+        elif key == "wifi":
+            ssid = self.values.get("wifi_ssid", "")
+            done = bool(ssid and str(ssid).strip())
+            self._set_tile_status(key, ssid[:12] + ("\u2026" if len(ssid) > 12 else "") if done else "")
+        elif key == "ssh":
+            pub = self.values.get("ssh_public", "")
+            priv = self.values.get("ssh_private", "")
+            done = bool(pub.strip() or priv.strip())
+            self._set_tile_status(key, "public+private" if (pub and priv) else ("public" if pub else ("private" if priv else "")))
         else:
             val = self.values.get(key)
             done = bool(val and str(val).strip())
@@ -1382,26 +1756,109 @@ class ConnectionPage(Gtk.Box):
                 self._set_tile_status(key, "")
         if done:
             ctx.add_class("tile-done")
-            self.checkmarks[key].show()
         else:
             ctx.remove_class("tile-done")
-            self.checkmarks[key].hide()
 
     def _set_tile_status(self, key, text):
         self.status_lbls[key].set_markup(f"<span size='small' color='#888'>{text}</span>")
 
+    def _edit_wifi(self):
+        d = Gtk.Dialog(title="WiFi", transient_for=self.wiz, modal=True)
+        d.set_default_size(380, -1)
+        d.set_resizable(False)
+
+        c = d.get_content_area()
+        c.set_margin_start(20)
+        c.set_margin_end(20)
+        c.set_margin_top(16)
+        c.set_margin_bottom(8)
+        c.set_spacing(6)
+
+        hdr = Gtk.Label(xalign=0)
+        hdr.set_markup("<b><span size='large'>WiFi Connection</span></b>")
+        c.pack_start(hdr, False, False, 0)
+
+        ssid_e = self._mk_entry("SSID", False, self.values.get("wifi_ssid", ""))
+        pass_e = self._mk_entry("Password", True, self.values.get("wifi_password", ""))
+        c.pack_start(ssid_e, False, False, 0)
+        c.pack_start(pass_e, False, False, 0)
+
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("_Save", Gtk.ResponseType.OK)
+
+        d.show_all()
+        response = d.run()
+        while response == Gtk.ResponseType.OK:
+            ssid = ssid_e.get_text().strip()
+            pwd = pass_e.get_text().strip()
+            if not ssid:
+                pass
+            if ssid:
+                self.values["wifi_ssid"] = ssid
+            else:
+                self.values.pop("wifi_ssid", None)
+            if pwd:
+                self.values["wifi_password"] = pwd
+            else:
+                self.values.pop("wifi_password", None)
+            self._update_tile("wifi")
+            break
+        d.destroy()
+
     def _mk_entry(self, placeholder, secret, text=""):
-        e = Gtk.Entry()
-        e.set_placeholder_text(placeholder)
-        e.set_visibility(not secret)
-        if text:
-            e.set_text(text)
+        e = PlaceholderEntry(placeholder=placeholder, secret=secret, text=text)
         if secret:
-            e.set_visibility(False)
             e.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
                                       "view-reveal-symbolic")
             e.connect("icon-press", self._toggle_visibility)
         return e
+
+    def _edit_ssh(self):
+        d = Gtk.Dialog(title="SSH Key", transient_for=self.wiz, modal=True)
+        d.set_default_size(480, -1)
+        d.set_resizable(True)
+
+        c = d.get_content_area()
+        c.set_margin_start(20)
+        c.set_margin_end(20)
+        c.set_margin_top(16)
+        c.set_margin_bottom(8)
+        c.set_spacing(6)
+
+        hdr = Gtk.Label(xalign=0)
+        hdr.set_markup("<b><span size='large'>SSH Key</span></b>")
+        c.pack_start(hdr, False, False, 0)
+        hint = Gtk.Label(xalign=0)
+        hint.set_markup("<span size='small' color='#888'>Public key is stored in the clear; the private key is encrypted at rest and only decrypted when a service needs it.</span>")
+        hint.set_line_wrap(True)
+        c.pack_start(hint, False, False, 0)
+
+        pub_e = self._mk_entry("ssh-ed25519 AAAA... (public)", False,
+                                self.values.get("ssh_public", ""))
+        priv_e = self._mk_entry("Private key (encrypted at rest)", True,
+                                self.values.get("ssh_private", ""))
+        c.pack_start(pub_e, False, False, 0)
+        c.pack_start(priv_e, False, False, 0)
+
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("_Save", Gtk.ResponseType.OK)
+
+        d.show_all()
+        response = d.run()
+        while response == Gtk.ResponseType.OK:
+            pub = pub_e.get_text().strip()
+            priv = priv_e.get_text().strip()
+            if pub:
+                self.values["ssh_public"] = pub
+            else:
+                self.values.pop("ssh_public", None)
+            if priv:
+                self.values["ssh_private"] = priv
+            else:
+                self.values.pop("ssh_private", None)
+            self._update_tile("ssh")
+            break
+        d.destroy()
 
     def _edit_git(self):
         d = Gtk.Dialog(title="Git", transient_for=self.wiz, modal=True)
@@ -1639,8 +2096,14 @@ class ConnectionPage(Gtk.Box):
     def set_initial_values(self, data):
         if not data:
             return
+        # ponytail: drop a leftover {"data": "<json>"} envelope key if present
+        if set(data.keys()) == {"data"} and isinstance(data["data"], str):
+            try:
+                data = json.loads(data["data"])
+            except Exception:
+                pass
         for k, v in data.items():
-            if v:
+            if v and not (k == "data" and isinstance(v, str)):
                 self.values[k] = v
         for k in list(self.tiles):
             self._update_tile(k)
@@ -1675,8 +2138,7 @@ class GitHubPage(Gtk.Box):
         git_icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
         git_icon.set_pixel_size(24)
 
-        self.repo_entry = Gtk.Entry()
-        self.repo_entry.set_placeholder_text("username/mujō")
+        self.repo_entry = PlaceholderEntry(placeholder="username/mujō")
         self.repo_entry.set_width_chars(30)
 
         gf.attach(git_icon, 0, 0, 1, 1)
@@ -1761,8 +2223,7 @@ class TokenPage(Gtk.Box):
         key_icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
         key_icon.set_pixel_size(24)
 
-        self.token_entry = Gtk.Entry()
-        self.token_entry.set_placeholder_text("ghp_xxxxxxxxxxxxxxxxxxxx")
+        self.token_entry = PlaceholderEntry(placeholder="ghp_xxxxxxxxxxxxxxxxxxxx")
         self.token_entry.set_width_chars(30)
         self.token_entry.set_visibility(False)
 
@@ -1820,8 +2281,7 @@ class PersistPage(Gtk.Box):
         gf.set_halign(Gtk.Align.CENTER)
 
         dest_lbl = Gtk.Label(label="Destination", xalign=1)
-        self.dest_entry = Gtk.Entry()
-        self.dest_entry.set_placeholder_text("/run/media/backup or user@host:path")
+        self.dest_entry = PlaceholderEntry(placeholder="/run/media/backup or user@host:path")
         self.dest_entry.set_width_chars(34)
         self.dest_entry.set_sensitive(False)
 
@@ -1920,16 +2380,36 @@ class DonePage(Gtk.Box):
         self.pack_start(Gtk.Box(), True, True, 0)
 
     def set_result(self, label):
-        txt = f"Password set and {label} installed." if label != "nothing" else "Password set. Install skipped."
+        # ponytail: keep the completion message broad; works for full or single-page runs
+        if label and label != "nothing":
+            txt = f"Your configuration has been applied: {label}."
+        else:
+            txt = "Your configuration has been applied successfully."
         self.detail_lbl.set_text(txt)
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="mojo-setup",
+        description="First-time setup wizard for NixOS (password, browser, encryption, etc.)",
+    )
+    parser.add_argument(
+        "--first-run", action="store_true",
+        help="exit immediately if the setup-done flag file already exists",
+    )
+    parser.add_argument(
+        "--page", metavar="NAME",
+        help="open and apply only a single page: "
+             "welcome, browser, social, sops, connection, github, token, persist",
+    )
+    args = parser.parse_args()
+
     flag = os.path.join(os.environ.get("XDG_CACHE_HOME",
                                        os.path.expanduser("~/.cache")),
-                        "niri-setup-done")
-    if len(sys.argv) > 1 and sys.argv[1] == "--first-run" and os.path.isfile(flag):
+                        "mojo-setup-done")
+    if args.first_run and os.path.isfile(flag):
         sys.exit(0)
 
-    w = SetupWizard()
+    w = SetupWizard(page=args.page)
     w.run()

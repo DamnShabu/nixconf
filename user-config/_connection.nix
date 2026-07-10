@@ -1,3 +1,0 @@
-{
-  tailscale = false;
-}

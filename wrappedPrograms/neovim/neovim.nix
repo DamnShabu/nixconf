@@ -90,15 +90,6 @@
     ];
   };
 
-  flake.wrappers.neovimFull = { wlib, ... }: {
-    imports = [
-      wlib.wrapperModules.neovim
-      self.wrapperModules.neovim-main
-      self.wrapperModules.neovim-allServers
-    ];
-    dynamicMode = false;
-  };
-
   flake.wrappers.neovimDynamic = { wlib, ... }: {
     imports = [
       wlib.wrapperModules.neovim

@@ -29,6 +29,8 @@
 
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
 
+    sops-nix.url = "github:Mic92/sops-nix";
+
   };
 
   # Import all .nix files from current directory except flake.nix recursively

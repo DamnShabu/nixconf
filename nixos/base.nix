@@ -13,35 +13,6 @@
           };
         };
 
-        autostart = lib.mkOption {
-          type = lib.types.listOf (lib.types.either lib.types.str lib.types.package);
-          default = [];
-        };
-
-        keymap = lib.mkOption {
-          type = lib.types.lazyAttrsOf (lib.types.either lib.types.attrs lib.types.package);
-          default = {};
-        };
-
-        keyboard = {
-          layout = lib.mkOption {
-            type = lib.types.str;
-            default = "us,ru,ua";
-          };
-          xkbOptions = lib.mkOption {
-            type = lib.types.str;
-            default = "grp:alt_shift_toggle,caps:escape";
-          };
-          repeatRate = lib.mkOption {
-            type = lib.types.int;
-            default = 40;
-          };
-          repeatDelay = lib.mkOption {
-            type = lib.types.int;
-            default = 250;
-          };
-        };
-
         locale = {
           timeZone = lib.mkOption {
             type = lib.types.str;
@@ -65,42 +36,6 @@
               LC_TIME = "uk_UA.UTF-8";
             };
           };
-        };
-
-        monitors = lib.mkOption {
-          type = lib.types.attrsOf (lib.types.submodule {
-            options = {
-              primary = lib.mkOption {
-                type = lib.types.bool;
-                default = false;
-              };
-              width = lib.mkOption {
-                type = lib.types.int;
-                example = 1920;
-              };
-              height = lib.mkOption {
-                type = lib.types.int;
-                example = 1080;
-              };
-              refreshRate = lib.mkOption {
-                type = lib.types.float;
-                default = 60;
-              };
-              x = lib.mkOption {
-                type = lib.types.int;
-                default = 0;
-              };
-              y = lib.mkOption {
-                type = lib.types.int;
-                default = 0;
-              };
-              enabled = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-              };
-            };
-          });
-          default = {};
         };
       };
 

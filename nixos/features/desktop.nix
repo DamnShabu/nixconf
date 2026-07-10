@@ -27,8 +27,8 @@
       pkgs.wl-clipboard
       selfpkgs.qylock
       pkgs.xdg-utils
-      selfpkgs.niri-setup
-      selfpkgs.niri-setup-desktop
+      selfpkgs.mojo-setup
+      selfpkgs.mojo-setup-desktop
       pkgs.age
       pkgs.sops
     ];

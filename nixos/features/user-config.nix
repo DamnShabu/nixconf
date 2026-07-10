@@ -5,8 +5,11 @@
     config,
     ...
   }: let
-    connFile = ../../user-config/_connection.nix;
-    conn = if builtins.pathExists connFile then import connFile else {};
+    # ponytail: read the connection secret decrypted by sops-nix (never plaintext)
+    connPath = lib.attrByPath ["sops" "secrets" "connection" "path"] null config;
+    conn = if connPath != null && builtins.pathExists connPath
+           then builtins.fromJSON (builtins.readFile connPath)
+           else {};
   in {
     networking.hostName = lib.mkIf (conn ? hostname && conn.hostname != "") conn.hostname;
 

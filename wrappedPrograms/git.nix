@@ -1,18 +1,15 @@
 {
   flake.wrappers.git = {
     wlib,
+    lib,
     pkgs,
     ...
-  }: let
-    userGit = import ../user-config/_git.nix;
-  in {
+  }: {
     imports = [wlib.modules.default];
     package = pkgs.git;
-    env = {
-      GIT_AUTHOR_NAME = userGit.name;
-      GIT_AUTHOR_EMAIL = userGit.email;
-      GIT_COMMITTER_NAME = userGit.name;
-      GIT_COMMITTER_EMAIL = userGit.email;
-    };
+    # ponytail: identity comes from the sops-decrypted git config, not plaintext.
+    # sops-nix writes it to a tmpfs path (RAM only); never persisted to disk.
+    env.GIT_CONFIG_GLOBAL = lib.mkIf (builtins.pathExists ../../secrets/git-config)
+      "/run/secrets/git/config";
   };
 }
