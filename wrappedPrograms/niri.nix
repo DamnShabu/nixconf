@@ -10,7 +10,7 @@
     config,
     ...
   }: let
-    noctaliaExe = lib.getExe self.packages.${pkgs.stdenv.hostPlatform.system}.noctalia-shell;
+    quickshell = import ../quickshell { inherit pkgs; };
   in {
     imports = [wlib.wrapperModules.niri];
 
@@ -103,7 +103,6 @@
         "Mod+Shift+9".move-column-to-workspace = "w8";
         "Mod+Shift+0".move-column-to-workspace = "w9";
 
-        "Mod+S".spawn-sh = "${noctaliaExe} ipc call launcher toggle";
         "Mod+V".spawn-sh = "${pkgs.alsa-utils}/bin/amixer sset Capture toggle";
 
         "XF86AudioRaiseVolume".spawn-sh = "wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+";
@@ -146,17 +145,7 @@
         {
           geometry-corner-radius = 8;
           clip-to-geometry = true;
-        }
-        {
-          matches = [
-            { app-id = "^mojo-setup$"; }
-          ];
-          background-effect = { blur = true; };
-        }
-        {
-          matches = [
-            { app-id = "^app\\.zen_browser\\.zen$"; }
-          ];
+          opacity = 0.9;
           background-effect = { blur = true; };
         }
       ];
@@ -186,13 +175,6 @@
         "w0" = settings;
         "w1" = settings;
         "w2" = settings;
-        "w3" = settings;
-        "w4" = settings;
-        "w5" = settings;
-        "w6" = settings;
-        "w7" = settings;
-        "w8" = settings;
-        "w9" = settings;
       };
 
       outputs = {
@@ -222,11 +204,12 @@
         lib.getExe pkgs.xwayland-satellite;
 
       spawn-sh-at-startup = [
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-polkit-agent}/bin/psst-polkit-agent"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-pinentry}/bin/psst-pinentry"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.psst-keyring-prompter}/bin/psst-keyring-prompter"
-        "${self.packages.${pkgs.stdenv.hostPlatform.system}.mojo-setup}/bin/mojo-setup --first-run"
-        noctaliaExe
+        "${pkgs.quickshell}/bin/quickshell -p ${quickshell.desktop}"
+        "${pkgs.quickshell}/bin/quickshell -p ${quickshell.notifd}"
+        "${pkgs.swayosd}/bin/swayosd --style-path ${quickshell.swayosdCSS}"
+        "${pkgs.vicinae}/bin/vicinae server"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.yin}/bin/yin"
+        "${self.packages.${pkgs.stdenv.hostPlatform.system}.yin}/bin/yinctl --restore"
       ];
     };
   };

@@ -40,18 +40,13 @@
       pkgs.lazygit
       pkgs.just
       pkgs.mprocs
-      selfpkgs.nh
-      selfpkgs.neovimDynamic
-      selfpkgs.qalc
-      selfpkgs.lf
-      selfpkgs.git
-      selfpkgs.jujutsu
-      selfpkgs.jjui
+      pkgs.nh
+      pkgs.lf
+      pkgs.git
       selfpkgs.nix-check-bin
       selfpkgs.jprocsall
       selfpkgs.jprocs
     ];
-    env.EDITOR = lib.getExe selfpkgs.neovimDynamic;
   };
 
   flake.wrappers.terminal = {pkgs, ...}: let

@@ -18,7 +18,6 @@
       extraGroups = ["wheel" "networkmanager" "tss"];
       shell = self.packages.${pkgs.stdenv.hostPlatform.system}.environment;
 
-      initialPassword = "12345";
       hashedPasswordFile = "/persist/passwd";
     };
 
@@ -49,8 +48,8 @@
       ".config/vicinae"
       ".local/share/vicinae"
       ".local/state/vicinae"
-
-      ".config/noctalia"
+      ".config/Code"
+      ".var/app/com.visualstudio.code"
 
       # ponytail: only the TPM-SEALED blob lives here (inert without hardware,
       # not a plaintext key). sops-age-restore copies it into tmpfs /run/sops-age
@@ -95,11 +94,7 @@
     persistence.cache.directories = [
       ".local/share/zoxide"
       ".local/share/direnv"
-      ".local/share/nvim"
       ".local/share/fish"
-      ".config/nvim"
-
-      ".cache/noctalia"
     ];
   };
 }

@@ -103,7 +103,6 @@
     name,
     text,
     runtimeInputs ? [],
-    neovim ? pkgs.neovim,
     shellcheck ? pkgs.shellcheck,
     bashInteractive ? pkgs.bashInteractive,
     extraShellcheckFlags ? [],
@@ -145,29 +144,18 @@
 
       prompt "$@"
 
-      while true; do
-        before="$(stat -c %Y "$script_path")"
-        ${neovim}/bin/nvim "$script_path"
-        after="$(stat -c %Y "$script_path")"
+      if ${shellcheck}/bin/shellcheck ${scFlags} "$script_path"; then
+        run "$@"
+        exit 0
+      fi
 
-        if [ "$before" = "$after" ]; then
-          prompt "$@"
-          continue
-        fi
-
-        if ${shellcheck}/bin/shellcheck ${scFlags} "$script_path"; then
-          break
-        fi
-
-        printf "shellcheck reported issues. [e=re-edit, f=force run, a=abort]: "
-        read -r choice </dev/tty
-        case "$choice" in
-          f|F) break ;;
-          a|A) exit 1 ;;
-        esac
-      done
-
-      run "$@"
+      printf "shellcheck reported issues. [e=re-edit, f=force run, a=abort]: "
+      read -r choice </dev/tty
+      case "$choice" in
+        f|F) run "$@" ;;
+        a|A) exit 1 ;;
+        *) prompt "$@" ;;
+      esac
     '';
   in
     pkgs.writeTextFile {

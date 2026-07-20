@@ -10,25 +10,17 @@
       self.nixosModules.zen
     ];
 
-    programs.niri.enable = true;
-    programs.niri.package = selfpkgs.niri;
-
-
     services.xserver.enable = true;
     services.displayManager.sddm.enable = true;
     services.displayManager.sddm.theme = "clockwork";
     services.displayManager.sddm.extraPackages = [ pkgs.qt6.qt5compat pkgs.qt6.qtmultimedia ];
-    services.displayManager.defaultSession = "niri";
 
     environment.systemPackages = [
       selfpkgs.terminal
       pkgs.pcmanfm
-      selfpkgs.noctalia-shell
       pkgs.wl-clipboard
       selfpkgs.qylock
       pkgs.xdg-utils
-      selfpkgs.mojo-setup
-      selfpkgs.mojo-setup-desktop
       pkgs.age
       pkgs.sops
     ];

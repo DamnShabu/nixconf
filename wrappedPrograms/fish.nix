@@ -7,8 +7,7 @@
   }: {
     imports = [wlib.wrapperModules.fish];
     configFile.content = let
-      selfpkgs = self.packages."${pkgs.stdenv.hostPlatform.system}";
-      lf = selfpkgs.lf;
+      lf = pkgs.lf;
     in
       # fish
       ''

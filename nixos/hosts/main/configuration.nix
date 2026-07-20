@@ -31,7 +31,6 @@
       self.nixosModules.steam
       self.nixosModules.telegram
       self.nixosModules.gaming
-      self.nixosModules.vr
       self.nixosModules.virt
       self.nixosModules.searxng
       self.nixosModules.user-config
@@ -40,6 +39,9 @@
       self.nixosModules.keys
       self.nixosModules.mullvad
       self.nixosModules.connections
+      self.nixosModules.notifications
+      self.nixosModules.desktopShell
+      self.nixosModules.yin
 
       # disko
       inputs.disko.nixosModules.disko
@@ -88,7 +90,6 @@
     programs.alvr.openFirewall = true;
 
     environment.systemPackages = with pkgs; [
-      winetricks
       glib
 
       bs-manager
@@ -96,7 +97,6 @@
       zerotierone
 
       android-tools
-      self.packages."${pkgs.stdenv.hostPlatform.system}".ask
 
       self.packages."${pkgs.stdenv.hostPlatform.system}".phisch-psst
     ];
@@ -114,7 +114,10 @@
 
     hardware.graphics.enable = true;
 
-    programs.niri.enable = true;
+    programs.niri = {
+      enable = true;
+      package = self.packages.${pkgs.stdenv.hostPlatform.system}.niri;
+    };
 
     networking.firewall.enable = false;
     programs.appimage.enable = true;
